@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from statistics import mean
-from typing import Any
+from typing import Any, cast
 
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.helpers.typing import StateType
@@ -17,6 +17,7 @@ from .api import ApiResponseValue
 
 CELL_VOLTAGE_DECIMAL_DIGITS = 3
 CELL_RESISTANCE_DECIMAL_DIGITS = 2
+CELL_RESISTANCE_ATTRIBUTE_DECIMAL_DIGITS = 3
 
 
 def get_populated_cells(
@@ -33,6 +34,25 @@ def get_populated_cells(
     return {
         cell_id: cell for cell_id, cell in value.cells.items() if cell.voltage_mv > 0
     }
+
+
+def get_cell_temperature(cell: BatteryModuleCellStatus) -> int:
+    """Return the cell temperature in °C.
+
+    The temperature is a signed byte, but rctclient decodes it as unsigned.
+    """
+    temperature = cell.temperature_c
+    return temperature - 256 if temperature > 127 else temperature
+
+
+def _positional[T](values: dict[int, T], slot_count: int) -> list[T | None]:
+    """List values by slot so that missing cells don't shift the numbering.
+
+    Trailing empty slots are dropped.
+    """
+    if not values:
+        return []
+    return [values.get(slot) for slot in range(min(slot_count, max(values) + 1))]
 
 
 def get_populated_cell_resistances(
@@ -118,7 +138,7 @@ def get_max_cell_temperature(
     cells = get_populated_cells(_first(values))
     if not cells:
         return None
-    return max(cell.temperature_c for cell in cells.values())
+    return max(get_cell_temperature(cell) for cell in cells.values())
 
 
 def get_min_cell_temperature(
@@ -127,7 +147,7 @@ def get_min_cell_temperature(
     cells = get_populated_cells(_first(values))
     if not cells:
         return None
-    return min(cell.temperature_c for cell in cells.values())
+    return min(get_cell_temperature(cell) for cell in cells.values())
 
 
 def get_cell_status_attributes(
@@ -137,14 +157,26 @@ def get_cell_status_attributes(
     if not cells:
         return {}
 
+    slot_count = len(cast(BatteryModuleStatus, _first(values)).cells)
     voltages = {cell_id: cell.voltage_mv for cell_id, cell in cells.items()}
-    temperatures = {cell_id: cell.temperature_c for cell_id, cell in cells.items()}
+    temperatures = {
+        cell_id: get_cell_temperature(cell) for cell_id, cell in cells.items()
+    }
 
+    # lists are indexed by cell slot, cells without a voltage are None
     return {
         "cell_count": len(cells),
-        "cell_voltages": [round(cell.voltage_v, 3) for cell in cells.values()],
-        "cell_temperatures": list(temperatures.values()),
-        "cell_status": [cell.status for cell in cells.values()],
+        "cell_voltages": _positional(
+            {
+                cell_id: round(cell.voltage_v, CELL_VOLTAGE_DECIMAL_DIGITS)
+                for cell_id, cell in cells.items()
+            },
+            slot_count,
+        ),
+        "cell_temperatures": _positional(temperatures, slot_count),
+        "cell_status": _positional(
+            {cell_id: cell.status for cell_id, cell in cells.items()}, slot_count
+        ),
         # 1-based cell numbers to match the module numbering
         "max_voltage_cell": max(voltages, key=lambda cell_id: voltages[cell_id]) + 1,
         "min_voltage_cell": min(voltages, key=lambda cell_id: voltages[cell_id]) + 1,
@@ -183,11 +215,18 @@ def get_cell_resistance_attributes(
     if not resistances:
         return {}
 
+    slot_count = len(cast(BatteryModuleResistance, _first(values)).cells)
+
+    # indexed by cell slot, cells without a resistance are None
     return {
-        "cell_resistances": [
-            round(resistance, CELL_RESISTANCE_DECIMAL_DIGITS)
-            for resistance in resistances.values()
-        ],
+        "cell_resistances": _positional(
+            {
+                # full precision of the 1/256 mΩ raw value
+                cell_id: round(resistance, CELL_RESISTANCE_ATTRIBUTE_DECIMAL_DIGITS)
+                for cell_id, resistance in resistances.items()
+            },
+            slot_count,
+        ),
         "max_resistance_cell": max(
             resistances, key=lambda cell_id: resistances[cell_id]
         )

@@ -45,35 +45,38 @@ def encode_module_resistance(resistances_mohm: list[float]) -> bytes:
 
 module_status = decode_value(
     DataType.BATTERY_MODULE_STATUS,
-    encode_module_status([(21, 3301, 0), (24, 3312, 0), (22, 3295, 1)]),
+    encode_module_status(
+        [(21, 3301, 0), (24, 3312, 0), (0, 0, 0), (22, 3295, 1), (255, 3300, 0)]
+    ),
 )
 
 module_resistance = decode_value(
     DataType.BATTERY_MODULE_RESISTANCE,
-    encode_module_resistance([0.5, 0.75, 0.625]),
+    encode_module_resistance([0.5, 0.75, 0, 0.625]),
 )
 
 
 def test_cell_voltages_ignore_empty_slots() -> None:
     assert get_max_cell_voltage(entity, [module_status]) == 3.312
     assert get_min_cell_voltage(entity, [module_status]) == 3.295
-    assert get_mean_cell_voltage(entity, [module_status]) == 3.303
+    assert get_mean_cell_voltage(entity, [module_status]) == 3.302
     assert get_cell_voltage_spread(entity, [module_status]) == 17
 
 
 def test_cell_temperatures() -> None:
     assert get_max_cell_temperature(entity, [module_status]) == 24
-    assert get_min_cell_temperature(entity, [module_status]) == 21
+    # temperatures are signed bytes
+    assert get_min_cell_temperature(entity, [module_status]) == -1
 
 
 def test_cell_status_attributes() -> None:
     assert get_cell_status_attributes(entity, [module_status]) == {
-        "cell_count": 3,
-        "cell_voltages": [3.301, 3.312, 3.295],
-        "cell_temperatures": [21, 24, 22],
-        "cell_status": [0, 0, 1],
+        "cell_count": 4,
+        "cell_voltages": [3.301, 3.312, None, 3.295, 3.3],
+        "cell_temperatures": [21, 24, None, 22, -1],
+        "cell_status": [0, 0, None, 1, 0],
         "max_voltage_cell": 2,
-        "min_voltage_cell": 3,
+        "min_voltage_cell": 4,
         "max_temperature_cell": 2,
     }
 
@@ -82,7 +85,7 @@ def test_cell_resistances() -> None:
     assert get_max_cell_resistance(entity, [module_resistance]) == 0.75
     assert get_mean_cell_resistance(entity, [module_resistance]) == 0.62
     assert get_cell_resistance_attributes(entity, [module_resistance]) == {
-        "cell_resistances": [0.5, 0.75, 0.62],
+        "cell_resistances": [0.5, 0.75, None, 0.625],
         "max_resistance_cell": 2,
     }
 

@@ -225,6 +225,7 @@ battery_sensor_entity_descriptions: list[RctPowerSensorEntityDescription] = [
         name="Battery State of Charge Low Target",
         update_priority=EntityUpdatePriority.FREQUENT,
         state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement="%",
     ),
     RctPowerSensorEntityDescription(
         get_device_info=get_battery_device_info,
@@ -232,6 +233,7 @@ battery_sensor_entity_descriptions: list[RctPowerSensorEntityDescription] = [
         name="Battery State of Charge High Target",
         update_priority=EntityUpdatePriority.FREQUENT,
         state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement="%",
     ),
     RctPowerSensorEntityDescription(
         get_device_info=get_battery_device_info,
@@ -254,6 +256,41 @@ battery_sensor_entity_descriptions: list[RctPowerSensorEntityDescription] = [
         update_priority=EntityUpdatePriority.INFREQUENT,
         device_class=SensorDeviceClass.TIMESTAMP,
         get_native_value=get_first_api_response_value_as_timestamp,
+    ),
+    RctPowerSensorEntityDescription(
+        get_device_info=get_battery_device_info,
+        key="battery.maximum_charge_current",
+        name="Battery Maximum Charging Current",
+        update_priority=EntityUpdatePriority.FREQUENT,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    RctPowerSensorEntityDescription(
+        get_device_info=get_battery_device_info,
+        key="acc_conv.i_charge_max",
+        name="Battery Converter Maximum Charging Current",
+        update_priority=EntityUpdatePriority.FREQUENT,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    RctPowerSensorEntityDescription(
+        get_device_info=get_battery_device_info,
+        key="acc_conv.i_discharge_max",
+        name="Battery Converter Maximum Discharging Current",
+        update_priority=EntityUpdatePriority.FREQUENT,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    RctPowerSensorEntityDescription(
+        get_device_info=get_battery_device_info,
+        key="power_mng.soc_strategy",
+        name="Battery State of Charge Strategy",
+        update_priority=EntityUpdatePriority.INFREQUENT,
+    ),
+    RctPowerSensorEntityDescription(
+        get_device_info=get_battery_device_info,
+        key="battery.efficiency",
+        name="Battery Efficiency",
+        update_priority=EntityUpdatePriority.INFREQUENT,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement="%",
     ),
 ]
 
