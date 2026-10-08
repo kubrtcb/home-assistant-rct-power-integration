@@ -13,7 +13,7 @@ from homeassistant.components.number import (
     NumberEntityDescription,
     NumberMode,
 )
-from homeassistant.const import EntityCategory, UnitOfPower
+from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfPower
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity import Entity
@@ -35,7 +35,8 @@ from .models import RctConfEntryOptions
 class RctPowerNumberEntityDescription(
     RctPowerEntityDescription, NumberEntityDescription
 ):
-    pass
+    # the inverter value multiplied by this is shown in Home Assistant
+    scale: float = 1
 
 
 def get_number_entity_descriptions(
@@ -59,6 +60,22 @@ def get_number_entity_descriptions(
             mode=NumberMode.BOX,
             entity_category=EntityCategory.CONFIG,
         ),
+        # the inverter takes a fraction of the solar plant peak power
+        RctPowerNumberEntityDescription(
+            get_device_info=get_inverter_device_info,
+            key="buf_v_control.power_reduction",
+            unique_id="external_power_reduction",
+            name="External Power Reduction",
+            icon="mdi:solar-power-variant",
+            update_priority=EntityUpdatePriority.INFREQUENT,
+            native_unit_of_measurement=PERCENTAGE,
+            native_min_value=0,
+            native_max_value=100,
+            native_step=1,
+            scale=100,
+            mode=NumberMode.BOX,
+            entity_category=EntityCategory.CONFIG,
+        ),
     ]
 
 
@@ -71,7 +88,7 @@ class RctPowerNumberEntity(NumberEntity, RctPowerEntity):
             self.object_infos[0].object_id, None
         )
         if isinstance(value, int | float) and math.isfinite(value):
-            return float(value)
+            return round(value * self.entity_description.scale, 2)
         return None
 
     async def async_set_native_value(self, value: float) -> None:
@@ -83,7 +100,8 @@ class RctPowerNumberEntity(NumberEntity, RctPowerEntity):
 
         object_id = self.object_infos[0].object_id
         coordinator = self.coordinators[0]
-        response = await coordinator.client.async_write_value(object_id, value)
+        scale = self.entity_description.scale
+        response = await coordinator.client.async_write_value(object_id, value / scale)
 
         if not isinstance(response, ValidApiResponse) or not isinstance(
             response.value, int | float
@@ -99,9 +117,9 @@ class RctPowerNumberEntity(NumberEntity, RctPowerEntity):
                     {**coordinator.data, object_id: response}
                 )
 
-        if not math.isclose(response.value, value, abs_tol=0.5):
+        if not math.isclose(response.value * scale, value, abs_tol=0.5):
             raise HomeAssistantError(
-                f"The inverter kept {response.value} W instead of {value} W"
+                f"The inverter kept {response.value * scale} instead of {value}"
             )
 
 

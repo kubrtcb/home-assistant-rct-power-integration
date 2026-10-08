@@ -33,11 +33,13 @@ LIMIT_ID = REGISTRY.get_by_name(
     "buf_v_control.power_reduction_max_solar_grid"
 ).object_id
 ENTITY_ID = "number.master_grid_feed_power_limit"
+REDUCTION_ID = REGISTRY.get_by_name("buf_v_control.power_reduction").object_id
+REDUCTION_ENTITY_ID = "number.master_external_power_reduction"
 
 
-def response(value: float) -> ValidApiResponse:
+def response(value: float, object_id: int = LIMIT_ID) -> ValidApiResponse:
     return ValidApiResponse(
-        object_id=LIMIT_ID, time=datetime.now(tz=UTC), value=value, raw=None
+        object_id=object_id, time=datetime.now(tz=UTC), value=value, raw=None
     )
 
 
@@ -55,6 +57,8 @@ async def fake_get_data(object_ids: list[int]) -> RctPowerData:
             )
         elif object_id == LIMIT_ID:
             data[object_id] = response(9600.0)
+        elif object_id == REDUCTION_ID:
+            data[object_id] = response(1.0, REDUCTION_ID)
     return data
 
 
@@ -81,11 +85,13 @@ async def setup(hass: HomeAssistant, options: dict) -> MockConfigEntry:
     return config_entry
 
 
-async def set_value(hass: HomeAssistant, value: float) -> None:
+async def set_value(
+    hass: HomeAssistant, value: float, entity_id: str = ENTITY_ID
+) -> None:
     await hass.services.async_call(
         NUMBER_DOMAIN,
         SERVICE_SET_VALUE,
-        {ATTR_ENTITY_ID: ENTITY_ID, ATTR_VALUE: value},
+        {ATTR_ENTITY_ID: entity_id, ATTR_VALUE: value},
         blocking=True,
     )
 
@@ -142,3 +148,30 @@ async def test_write_not_accepted(hass: HomeAssistant) -> None:
         await set_value(hass, 4000)
 
     assert hass.states.get(ENTITY_ID).state == "9600.0"  # type: ignore
+
+
+async def test_write_external_power_reduction(hass: HomeAssistant) -> None:
+    """The inverter takes a fraction, Home Assistant shows percent."""
+    await setup(hass, {CONF_ALLOW_WRITES: True})
+
+    state = hass.states.get(REDUCTION_ENTITY_ID)
+    assert state is not None
+    assert state.state == "100.0"
+    assert state.attributes["unit_of_measurement"] == "%"
+
+    with patch(
+        "custom_components.rct_power.RctPowerApiClient.async_write_value",
+        new=AsyncMock(
+            side_effect=lambda object_id, value: response(value, REDUCTION_ID)
+        ),
+    ) as write:
+        await set_value(hass, 60, REDUCTION_ENTITY_ID)
+        write.assert_awaited_once_with(REDUCTION_ID, 0.6)
+
+    assert hass.states.get(REDUCTION_ENTITY_ID).state == "60.0"  # type: ignore
+    [sensor] = [
+        s
+        for s in hass.states.async_all("sensor")
+        if s.entity_id.endswith("_external_power_reduction")
+    ]
+    assert sensor.state == "60.0"
