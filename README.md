@@ -164,6 +164,20 @@ Health` and `Maximum Charging/Discharging Current`.
 | Battery Module N Max Cell Resistance  | mΩ   | the highest internal cell resistance of module N, all cells in attributes |
 | Battery Module N Mean Cell Resistance | mΩ   | the mean internal cell resistance of module N                             |
 
+Each tower also has four sensors summarizing all of its cells, meant for
+tracking cell health over months (they keep long-term statistics):
+
+| Entity name                           | Unit | Description                                                                  |
+| ------------------------------------- | ---- | ---------------------------------------------------------------------------- |
+| Battery Cell Voltage Spread           | mV   | the difference between the highest and lowest cell of the tower              |
+| Battery Weakest Cell Deviation        | mV   | how far the lowest cell is below the tower's median cell, position in `min_voltage_cell` |
+| Battery Max Cell Resistance           | mΩ   | the highest internal cell resistance of the tower, position in `max_resistance_cell` |
+| Battery Max Cell Resistance Deviation | %    | how much the highest cell resistance exceeds the tower's median              |
+
+Their attributes `module_cell_voltages` and `module_cell_resistances` hold all
+cells of the tower (one list per module), which is enough to draw a heatmap
+with a markdown card.
+
 The per-cell values (`cell_voltages`, `cell_temperatures`, `cell_status`,
 `cell_resistances`) are exposed as attributes and are not recorded in the
 history database. The lists are indexed by cell position, a cell without a
