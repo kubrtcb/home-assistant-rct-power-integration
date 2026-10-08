@@ -190,6 +190,39 @@ class RctPowerBitfieldSensorEntity(RctPowerSensorEntity):
         }
 
 
+class RctPowerBatteryModuleSensorEntity(RctPowerSensorEntity):
+    """Sensor derived from the cell data of a single battery module.
+
+    The per-cell values are exposed as attributes, which are excluded from the
+    recorder to keep the database small.
+    """
+
+    entity_description: RctPowerBatteryModuleSensorEntityDescription  # pyright: ignore [reportIncompatibleVariableOverride]
+
+    _unrecorded_attributes = frozenset(
+        {
+            "cell_count",
+            "cell_voltages",
+            "cell_temperatures",
+            "cell_status",
+            "cell_resistances",
+            "max_voltage_cell",
+            "min_voltage_cell",
+            "max_temperature_cell",
+            "max_resistance_cell",
+        }
+    )
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        get_extra_state_attributes = self.entity_description.get_extra_state_attributes
+
+        if get_extra_state_attributes is None:
+            return None
+
+        return get_extra_state_attributes(self, self.get_valid_api_responses())
+
+
 @dataclass(frozen=True, kw_only=True)
 class RctPowerEntityDescription(EntityDescription):
     icon: str | None = ICON
@@ -218,6 +251,17 @@ class RctPowerBitfieldSensorEntityDescription(
         [RctPowerSensorEntity, list[ApiResponseValue | None]],
         StateType | date | datetime | Decimal,
     ] = get_api_response_values_as_bitfield
+
+
+@dataclass(frozen=True, kw_only=True)
+class RctPowerBatteryModuleSensorEntityDescription(RctPowerSensorEntityDescription):
+    get_extra_state_attributes: (
+        Callable[
+            [RctPowerSensorEntity, list[ApiResponseValue | None]],
+            dict[str, Any],
+        ]
+        | None
+    ) = None
 
 
 def slugify_entity_name(name: str) -> str:

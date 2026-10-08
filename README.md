@@ -117,23 +117,53 @@ depending on your preference.
 
 ### Battery
 
-| Entity name                              | Unit | Description                                                                   |
-| ---------------------------------------- | ---- | ----------------------------------------------------------------------------- |
-| Battery Power                            | W    | the instantaneous power consumed from (`> 0`) or fed into (`< 0`) the battery |
-| Battery Current                          | A    | the instantaneous current flowing from or to the battery                      |
-| Battery Voltage                          | V    | the instantaneous voltage of the battery                                      |
-| Battery Temperature                      | °C   | the instantaneous temperature of the battery                                  |
-| Battery Cycles                           |      | the recorded full charge/discharge cycles of the battery                      |
-| Battery State of Charge                  | %    | the instantaneous state of charge of the battery                              |
-| Battery State of Charge Target           | %    | the state of charge of the battery aimed for by the system                    |
-| Battery Minimum State of Charge          | %    | the configured minimum state of charge of the battery for regular operation   |
-| Battery Minimum State of Charge (island) | %    | the minimum state of charge of the battery to maintain as an island backup    |
-| Battery Maximum State of Charge          | %    | the maximum state of charge of the battery to aim for to improve battery life |
-| Battery State of Health                  | %    | the estimated state of health of the battery                                  |
-| Battery Stored Energy                    | Wh   | the cumulative energy fed into the battery                                    |
-| Battery Used Energy                      | Wh   | the cumulative energy consumed from the battery                               |
-| Battery Status                           |      | the current battery status (incomplete)                                       |
-| Next Battery Calibration Date            |      | the date and time of the next planned battery calibration                     |
+| Entity name                                   | Unit | Description                                                                   |
+| --------------------------------------------- | ---- | ----------------------------------------------------------------------------- |
+| Battery Power                                 | W    | the instantaneous power consumed from (`> 0`) or fed into (`< 0`) the battery |
+| Battery Current                               | A    | the instantaneous current flowing from or to the battery                      |
+| Battery Voltage                               | V    | the instantaneous voltage of the battery                                      |
+| Battery Temperature                           | °C   | the instantaneous temperature of the battery                                  |
+| Battery Cycles                                |      | the recorded full charge/discharge cycles of the battery                      |
+| Battery State of Charge                       | %    | the instantaneous state of charge of the battery                              |
+| Battery State of Charge Target                | %    | the state of charge of the battery aimed for by the system                    |
+| Battery Minimum State of Charge               | %    | the configured minimum state of charge of the battery for regular operation   |
+| Battery Minimum State of Charge (island)      | %    | the minimum state of charge of the battery to maintain as an island backup    |
+| Battery Maximum State of Charge               | %    | the maximum state of charge of the battery to aim for to improve battery life |
+| Battery State of Health                       | %    | the estimated state of health of the battery                                  |
+| Battery Stored Energy                         | Wh   | the cumulative energy fed into the battery                                    |
+| Battery Used Energy                           | Wh   | the cumulative energy consumed from the battery                               |
+| Battery Status                                |      | the current battery status (incomplete)                                       |
+| Battery Maximum Charging Current              | A    | the charging current currently allowed by the BMS                             |
+| Battery Converter Maximum Charging Current    | A    | the charging current currently allowed by the inverter's battery converter    |
+| Battery Converter Maximum Discharging Current | A    | the discharging current currently allowed by the battery converter            |
+| Battery State of Charge Strategy              |      | the SOC target selection (e.g. 4 = internal, 2 = external)                    |
+| Battery Efficiency                            | %    | the ratio of used to stored energy                                            |
+| Next Battery Calibration Date                 |      | the date and time of the next planned battery calibration                     |
+
+### Battery towers, modules and cells
+
+An inverter can have two battery towers. The second tower shows up as a
+separate device called "Battery Tower 2". Entities of the second tower are
+prefixed with `Battery Tower 2` instead of `Battery`.
+
+| Entity name                           | Unit | Description                                                               |
+| ------------------------------------- | ---- | ------------------------------------------------------------------------- |
+| Battery Max/Min Cell Voltage          | V    | the highest/lowest cell voltage of the tower as reported by its BMS       |
+| Battery Max/Min Cell Temperature      | °C   | the highest/lowest cell temperature of the tower as reported by its BMS   |
+| Battery Module N Cycles               |      | the recorded cycles of module N                                           |
+| Battery Module N Max Cell Voltage     | V    | the highest cell voltage of module N, all cells in the attributes         |
+| Battery Module N Min Cell Voltage     | V    | the lowest cell voltage of module N                                       |
+| Battery Module N Mean Cell Voltage    | V    | the mean cell voltage of module N (disabled by default)                   |
+| Battery Module N Cell Voltage Spread  | mV   | the difference between the highest and lowest cell voltage of module N    |
+| Battery Module N Max Cell Temperature | °C   | the highest cell temperature of module N                                  |
+| Battery Module N Min Cell Temperature | °C   | the lowest cell temperature of module N (disabled by default)             |
+| Battery Module N Max Cell Resistance  | mΩ   | the highest internal cell resistance of module N, all cells in attributes |
+| Battery Module N Mean Cell Resistance | mΩ   | the mean internal cell resistance of module N                             |
+
+The per-cell values (`cell_voltages`, `cell_temperatures`, `cell_status`,
+`cell_resistances`) are exposed as attributes and are not recorded in the
+history database. The lists are indexed by cell position, a cell without a
+valid reading is `null`.
 
 ### Household consumers and producers
 

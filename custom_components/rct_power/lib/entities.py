@@ -1,14 +1,40 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
+from homeassistant.const import (
+    EntityCategory,
+    UnitOfElectricPotential,
+    UnitOfTemperature,
+)
+from homeassistant.helpers.device_registry import DeviceInfo
 from rctclient.registry import REGISTRY
 
-from ..const import EntityUpdatePriority
-from .device_info_helpers import get_battery_device_info, get_inverter_device_info
+from ..const import BATTERY_MODULE_COUNT, EntityUpdatePriority
+from .battery_module_helpers import (
+    get_cell_resistance_attributes,
+    get_cell_status_attributes,
+    get_cell_voltage_spread,
+    get_first_api_response_value_as_cell_voltage,
+    get_max_cell_resistance,
+    get_max_cell_temperature,
+    get_max_cell_voltage,
+    get_mean_cell_resistance,
+    get_mean_cell_voltage,
+    get_min_cell_temperature,
+    get_min_cell_voltage,
+)
+from .device_info_helpers import (
+    get_battery_device_info,
+    get_battery_tower_2_device_info,
+    get_inverter_device_info,
+)
 from .entity import (
+    RctPowerBatteryModuleSensorEntityDescription,
     RctPowerBitfieldSensorEntityDescription,
+    RctPowerEntity,
     RctPowerSensorEntityDescription,
 )
 from .state_helpers import (
@@ -199,6 +225,7 @@ battery_sensor_entity_descriptions: list[RctPowerSensorEntityDescription] = [
         name="Battery State of Charge Low Target",
         update_priority=EntityUpdatePriority.FREQUENT,
         state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement="%",
     ),
     RctPowerSensorEntityDescription(
         get_device_info=get_battery_device_info,
@@ -206,6 +233,7 @@ battery_sensor_entity_descriptions: list[RctPowerSensorEntityDescription] = [
         name="Battery State of Charge High Target",
         update_priority=EntityUpdatePriority.FREQUENT,
         state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement="%",
     ),
     RctPowerSensorEntityDescription(
         get_device_info=get_battery_device_info,
@@ -228,6 +256,262 @@ battery_sensor_entity_descriptions: list[RctPowerSensorEntityDescription] = [
         update_priority=EntityUpdatePriority.INFREQUENT,
         device_class=SensorDeviceClass.TIMESTAMP,
         get_native_value=get_first_api_response_value_as_timestamp,
+    ),
+    RctPowerSensorEntityDescription(
+        get_device_info=get_battery_device_info,
+        key="battery.maximum_charge_current",
+        name="Battery Maximum Charging Current",
+        update_priority=EntityUpdatePriority.FREQUENT,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    RctPowerSensorEntityDescription(
+        get_device_info=get_battery_device_info,
+        key="acc_conv.i_charge_max",
+        name="Battery Converter Maximum Charging Current",
+        update_priority=EntityUpdatePriority.FREQUENT,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    RctPowerSensorEntityDescription(
+        get_device_info=get_battery_device_info,
+        key="acc_conv.i_discharge_max",
+        name="Battery Converter Maximum Discharging Current",
+        update_priority=EntityUpdatePriority.FREQUENT,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    RctPowerSensorEntityDescription(
+        get_device_info=get_battery_device_info,
+        key="power_mng.soc_strategy",
+        name="Battery State of Charge Strategy",
+        update_priority=EntityUpdatePriority.INFREQUENT,
+    ),
+    RctPowerSensorEntityDescription(
+        get_device_info=get_battery_device_info,
+        key="battery.efficiency",
+        name="Battery Efficiency",
+        update_priority=EntityUpdatePriority.INFREQUENT,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement="%",
+    ),
+]
+
+
+def get_battery_tower_sensor_entity_descriptions(
+    object_prefix: str,
+    name_prefix: str,
+    get_device_info: Callable[[RctPowerEntity], DeviceInfo | None],
+) -> list[RctPowerSensorEntityDescription]:
+    """Sensors reported by the BMS of a battery tower."""
+    return [
+        RctPowerSensorEntityDescription(
+            get_device_info=get_device_info,
+            key=f"{object_prefix}.max_cell_voltage",
+            name=f"{name_prefix} Max Cell Voltage",
+            update_priority=EntityUpdatePriority.FREQUENT,
+            state_class=SensorStateClass.MEASUREMENT,
+            device_class=SensorDeviceClass.VOLTAGE,
+            native_unit_of_measurement=UnitOfElectricPotential.VOLT,
+            suggested_display_precision=3,
+            get_native_value=get_first_api_response_value_as_cell_voltage,
+        ),
+        RctPowerSensorEntityDescription(
+            get_device_info=get_device_info,
+            key=f"{object_prefix}.min_cell_voltage",
+            name=f"{name_prefix} Min Cell Voltage",
+            update_priority=EntityUpdatePriority.FREQUENT,
+            state_class=SensorStateClass.MEASUREMENT,
+            device_class=SensorDeviceClass.VOLTAGE,
+            native_unit_of_measurement=UnitOfElectricPotential.VOLT,
+            suggested_display_precision=3,
+            get_native_value=get_first_api_response_value_as_cell_voltage,
+        ),
+        RctPowerSensorEntityDescription(
+            get_device_info=get_device_info,
+            key=f"{object_prefix}.max_cell_temperature",
+            name=f"{name_prefix} Max Cell Temperature",
+            update_priority=EntityUpdatePriority.FREQUENT,
+            state_class=SensorStateClass.MEASUREMENT,
+            device_class=SensorDeviceClass.TEMPERATURE,
+            native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        ),
+        RctPowerSensorEntityDescription(
+            get_device_info=get_device_info,
+            key=f"{object_prefix}.min_cell_temperature",
+            name=f"{name_prefix} Min Cell Temperature",
+            update_priority=EntityUpdatePriority.FREQUENT,
+            state_class=SensorStateClass.MEASUREMENT,
+            device_class=SensorDeviceClass.TEMPERATURE,
+            native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        ),
+    ]
+
+
+def get_battery_module_sensor_entity_descriptions(
+    object_prefix: str,
+    name_prefix: str,
+    get_device_info: Callable[[RctPowerEntity], DeviceInfo | None],
+) -> list[RctPowerSensorEntityDescription]:
+    """Sensors for each module of a battery tower."""
+    descriptions: list[RctPowerSensorEntityDescription] = []
+
+    for module_index in range(BATTERY_MODULE_COUNT):
+        module_name = f"{name_prefix} Module {module_index + 1}"
+        cells_object_name = f"{object_prefix}.cells[{module_index}]"
+        cells_object_id = REGISTRY.get_by_name(cells_object_name).object_id
+        resist_object_name = f"{object_prefix}.cells_resist[{module_index}]"
+        resist_object_id = REGISTRY.get_by_name(resist_object_name).object_id
+
+        descriptions += [
+            RctPowerSensorEntityDescription(
+                get_device_info=get_device_info,
+                key=f"{object_prefix}.stack_cycles[{module_index}]",
+                name=f"{module_name} Cycles",
+                update_priority=EntityUpdatePriority.INFREQUENT,
+                state_class=SensorStateClass.TOTAL_INCREASING,
+            ),
+            RctPowerBatteryModuleSensorEntityDescription(
+                get_device_info=get_device_info,
+                key=f"{cells_object_name}.max_cell_voltage",
+                object_names=[cells_object_name],
+                unique_id=f"{cells_object_id}-max_cell_voltage",
+                name=f"{module_name} Max Cell Voltage",
+                update_priority=EntityUpdatePriority.INFREQUENT,
+                state_class=SensorStateClass.MEASUREMENT,
+                device_class=SensorDeviceClass.VOLTAGE,
+                native_unit_of_measurement=UnitOfElectricPotential.VOLT,
+                suggested_display_precision=3,
+                get_native_value=get_max_cell_voltage,
+                get_extra_state_attributes=get_cell_status_attributes,
+            ),
+            RctPowerBatteryModuleSensorEntityDescription(
+                get_device_info=get_device_info,
+                key=f"{cells_object_name}.min_cell_voltage",
+                object_names=[cells_object_name],
+                unique_id=f"{cells_object_id}-min_cell_voltage",
+                name=f"{module_name} Min Cell Voltage",
+                update_priority=EntityUpdatePriority.INFREQUENT,
+                state_class=SensorStateClass.MEASUREMENT,
+                device_class=SensorDeviceClass.VOLTAGE,
+                native_unit_of_measurement=UnitOfElectricPotential.VOLT,
+                suggested_display_precision=3,
+                get_native_value=get_min_cell_voltage,
+            ),
+            RctPowerBatteryModuleSensorEntityDescription(
+                get_device_info=get_device_info,
+                key=f"{cells_object_name}.mean_cell_voltage",
+                object_names=[cells_object_name],
+                unique_id=f"{cells_object_id}-mean_cell_voltage",
+                name=f"{module_name} Mean Cell Voltage",
+                update_priority=EntityUpdatePriority.INFREQUENT,
+                state_class=SensorStateClass.MEASUREMENT,
+                device_class=SensorDeviceClass.VOLTAGE,
+                native_unit_of_measurement=UnitOfElectricPotential.VOLT,
+                suggested_display_precision=3,
+                get_native_value=get_mean_cell_voltage,
+                entity_registry_enabled_default=False,
+            ),
+            RctPowerBatteryModuleSensorEntityDescription(
+                get_device_info=get_device_info,
+                key=f"{cells_object_name}.cell_voltage_spread",
+                object_names=[cells_object_name],
+                unique_id=f"{cells_object_id}-cell_voltage_spread",
+                name=f"{module_name} Cell Voltage Spread",
+                update_priority=EntityUpdatePriority.INFREQUENT,
+                state_class=SensorStateClass.MEASUREMENT,
+                device_class=SensorDeviceClass.VOLTAGE,
+                native_unit_of_measurement=UnitOfElectricPotential.MILLIVOLT,
+                get_native_value=get_cell_voltage_spread,
+            ),
+            RctPowerBatteryModuleSensorEntityDescription(
+                get_device_info=get_device_info,
+                key=f"{cells_object_name}.max_cell_temperature",
+                object_names=[cells_object_name],
+                unique_id=f"{cells_object_id}-max_cell_temperature",
+                name=f"{module_name} Max Cell Temperature",
+                update_priority=EntityUpdatePriority.INFREQUENT,
+                state_class=SensorStateClass.MEASUREMENT,
+                device_class=SensorDeviceClass.TEMPERATURE,
+                native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+                get_native_value=get_max_cell_temperature,
+            ),
+            RctPowerBatteryModuleSensorEntityDescription(
+                get_device_info=get_device_info,
+                key=f"{cells_object_name}.min_cell_temperature",
+                object_names=[cells_object_name],
+                unique_id=f"{cells_object_id}-min_cell_temperature",
+                name=f"{module_name} Min Cell Temperature",
+                update_priority=EntityUpdatePriority.INFREQUENT,
+                state_class=SensorStateClass.MEASUREMENT,
+                device_class=SensorDeviceClass.TEMPERATURE,
+                native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+                get_native_value=get_min_cell_temperature,
+                entity_registry_enabled_default=False,
+            ),
+            RctPowerBatteryModuleSensorEntityDescription(
+                get_device_info=get_device_info,
+                key=f"{resist_object_name}.max_cell_resistance",
+                object_names=[resist_object_name],
+                unique_id=f"{resist_object_id}-max_cell_resistance",
+                name=f"{module_name} Max Cell Resistance",
+                update_priority=EntityUpdatePriority.STATIC,
+                state_class=SensorStateClass.MEASUREMENT,
+                native_unit_of_measurement="mΩ",
+                entity_category=EntityCategory.DIAGNOSTIC,
+                get_native_value=get_max_cell_resistance,
+                get_extra_state_attributes=get_cell_resistance_attributes,
+            ),
+            RctPowerBatteryModuleSensorEntityDescription(
+                get_device_info=get_device_info,
+                key=f"{resist_object_name}.mean_cell_resistance",
+                object_names=[resist_object_name],
+                unique_id=f"{resist_object_id}-mean_cell_resistance",
+                name=f"{module_name} Mean Cell Resistance",
+                update_priority=EntityUpdatePriority.STATIC,
+                state_class=SensorStateClass.MEASUREMENT,
+                native_unit_of_measurement="mΩ",
+                entity_category=EntityCategory.DIAGNOSTIC,
+                get_native_value=get_mean_cell_resistance,
+            ),
+        ]
+
+    return descriptions
+
+
+battery_tower_2_sensor_entity_descriptions: list[RctPowerSensorEntityDescription] = [
+    RctPowerSensorEntityDescription(
+        get_device_info=get_battery_tower_2_device_info,
+        key="battery_placeholder[0].bms_sn",
+        name="Battery Tower 2 Battery Management System Serial Number",
+        update_priority=EntityUpdatePriority.STATIC,
+    ),
+    RctPowerSensorEntityDescription(
+        get_device_info=get_battery_tower_2_device_info,
+        key="battery_placeholder[0].bms_software_version",
+        name="Battery Tower 2 Battery Management System Software Version",
+        update_priority=EntityUpdatePriority.STATIC,
+    ),
+    *(
+        RctPowerSensorEntityDescription(
+            get_device_info=get_battery_tower_2_device_info,
+            key=f"battery_placeholder[0].module_sn[{module_index}]",
+            name=f"Battery Tower 2 Module {module_index + 1} Serial Number",
+            update_priority=EntityUpdatePriority.STATIC,
+        )
+        for module_index in range(BATTERY_MODULE_COUNT)
+    ),
+    *get_battery_tower_sensor_entity_descriptions(
+        "battery_placeholder[0]", "Battery Tower 2", get_battery_tower_2_device_info
+    ),
+]
+
+battery_cell_sensor_entity_descriptions: list[RctPowerSensorEntityDescription] = [
+    *get_battery_tower_sensor_entity_descriptions(
+        "battery", "Battery", get_battery_device_info
+    ),
+    *get_battery_module_sensor_entity_descriptions(
+        "battery", "Battery", get_battery_device_info
+    ),
+    *get_battery_module_sensor_entity_descriptions(
+        "battery_placeholder[0]", "Battery Tower 2", get_battery_tower_2_device_info
     ),
 ]
 
@@ -777,6 +1061,8 @@ bitfield_sensor_entity_descriptions: list[RctPowerBitfieldSensorEntityDescriptio
 
 sensor_entity_descriptions = [
     *battery_sensor_entity_descriptions,
+    *battery_tower_2_sensor_entity_descriptions,
+    *battery_cell_sensor_entity_descriptions,
     *inverter_sensor_entity_descriptions,
     *bitfield_sensor_entity_descriptions,
 ]
