@@ -22,7 +22,7 @@ from rctclient.types import (
     DataType,
     EventEntry,
 )
-from rctclient.utils import decode_value
+from rctclient.utils import decode_value, encode_value
 
 from ..const import LOGGER
 
@@ -136,6 +136,41 @@ class RctPowerApiClient:
                         )
                         for object_id in object_ids
                     }
+                finally:
+                    writer.close()
+
+    async def async_write_value(self, object_id: int, value: float) -> ApiResponse:
+        """Write a value to the inverter and return the value read back.
+
+        The inverter keeps such settings permanently, so this should only be
+        called when the value actually changes.
+        """
+        object_info = REGISTRY.get_by_id(object_id)
+        payload = encode_value(object_info.request_data_type, value)  # type: ignore
+        write_command_frame = SendFrame(
+            command=Command.WRITE, id=object_id, payload=payload
+        )
+
+        async with self._connection_lock:
+            async with asyncio.timeout(CONNECTION_TIMEOUT):
+                reader, writer = await open_connection(
+                    host=self._hostname, port=self._port
+                )
+
+                try:
+                    LOGGER.info(
+                        "Writing %s to RCT Power object %x (%s)",
+                        value,
+                        object_id,
+                        object_info.name,
+                    )
+                    writer.write(write_command_frame.data)
+                    await writer.drain()
+
+                    # read the value back to confirm the inverter accepted it
+                    return await self._read_object(
+                        reader=reader, writer=writer, object_id=object_id
+                    )
                 finally:
                     writer.close()
 
