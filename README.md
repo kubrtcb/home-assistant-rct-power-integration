@@ -164,7 +164,7 @@ Health` and `Maximum Charging/Discharging Current`.
 | Battery Module N Max Cell Resistance  | mΩ   | the highest internal cell resistance of module N, all cells in attributes |
 | Battery Module N Mean Cell Resistance | mΩ   | the mean internal cell resistance of module N                             |
 
-Each tower also has four sensors summarizing all of its cells, meant for
+Each tower also has five sensors summarizing all of its cells, meant for
 tracking cell health over months (they keep long-term statistics):
 
 | Entity name                           | Unit | Description                                                                  |
@@ -173,10 +173,36 @@ tracking cell health over months (they keep long-term statistics):
 | Battery Weakest Cell Deviation        | mV   | how far the lowest cell is below the tower's median cell, position in `min_voltage_cell` |
 | Battery Max Cell Resistance           | mΩ   | the highest internal cell resistance of the tower, position in `max_resistance_cell` |
 | Battery Max Cell Resistance Deviation | %    | how much the highest cell resistance exceeds the tower's median              |
+| Battery Flagged Cells                 |      | how many cells report a non-zero status byte, see below                     |
 
 Their attributes `module_cell_voltages` and `module_cell_resistances` hold all
 cells of the tower (one list per module), which is enough to draw a heatmap
 with a markdown card.
+
+#### Tower connection, balancing and calibration
+
+| Entity name                         | Type          | Description                                                                 |
+| ----------------------------------- | ------------- | --------------------------------------------------------------------------- |
+| Battery (Tower 2) Connection        | binary sensor | off when the tower voltage differs from the battery voltage measured by the inverter by 10 V or more |
+| Battery Balancing                   | binary sensor | the balancing bit of the battery status                                     |
+| Battery Calibration                 | binary sensor | the battery status reports a calibration charge                            |
+| Battery Calibration Interval        | d             | how often the inverter runs a calibration charge                            |
+| Battery Calibration Charge Power    | W             | the charging power used for the calibration                                 |
+
+All towers of an inverter sit on the same DC bus, so a connected tower has
+practically the bus voltage. When the BMS opens the contactor of a tower (for
+example because it is deeply discharged) the tower keeps reporting its own
+voltage, which then drifts away from the bus, and its cell data usually reads
+as zeros. The `tower_voltage`, `bus_voltage` and `voltage_difference`
+attributes show the values behind the decision. Without a reading the
+connection is unknown.
+
+The meaning of the per-cell status byte is not documented. It was 0 for every
+cell in all snapshots so far, which were all taken on the flat part of the LFP
+curve. It is expected to flag cells the BMS is balancing near the top of the
+charge, e.g. during the calibration charge (`Next Battery Calibration Date`).
+`Battery Flagged Cells` counts those cells and keeps long-term statistics, the
+`flagged_cells` attribute lists their positions and raw status bytes.
 
 The per-cell values (`cell_voltages`, `cell_temperatures`, `cell_status`,
 `cell_resistances`) are exposed as attributes and are not recorded in the

@@ -361,3 +361,100 @@ def get_tower_cell_resistance_attributes(
             for value in values
         ],
     }
+
+
+def get_tower_flagged_cell_count(
+    entity: SensorEntity, values: list[ApiResponseValue | None]
+) -> StateType:
+    """Number of cells of the tower with a non-zero status byte.
+
+    The meaning of the status byte is not documented. It is expected to flag
+    cells the BMS is balancing, which happens near the top of the charge, e.g.
+    during a calibration charge.
+    """
+    statuses = _tower_cell_statuses(values)
+    if not statuses:
+        return None
+    return sum(1 for status in statuses.values() if status != 0)
+
+
+def get_tower_cell_status_attributes(
+    entity: SensorEntity, values: list[ApiResponseValue | None]
+) -> dict[str, Any]:
+    statuses = _tower_cell_statuses(values)
+    if not statuses:
+        return {}
+
+    voltages = _tower_cell_voltages(values)
+    flagged = {label: status for label, status in statuses.items() if status != 0}
+
+    return {
+        "cell_count": len(statuses),
+        # positions and raw status bytes of the flagged cells only
+        "flagged_cells": flagged,
+        "flagged_cell_voltages": {label: voltages[label] for label in flagged},
+        "median_cell_voltage": round(median(voltages.values()) / 1000, 4),
+    }
+
+
+def _tower_cell_statuses(values: list[ApiResponseValue | None]) -> dict[str, int]:
+    """Status bytes of all cells of the tower, keyed by position."""
+    return {
+        _cell_label(module_index, cell_id): cell.status
+        for module_index, value in enumerate(values)
+        for cell_id, cell in get_populated_cells(value).items()
+    }
+
+
+#
+# Tower connection
+#
+# below this the tower voltage is no reading at all, e.g. no second tower
+TOWER_MIN_VOLTAGE = 50.0
+# parallel towers on the same DC bus differ by well under a volt; a tower
+# whose contactor is open drifts away from the bus by tens of volts
+TOWER_DISCONNECTED_VOLTAGE_DIFFERENCE = 10.0
+
+
+def _tower_and_bus_voltage(
+    values: list[ApiResponseValue | None],
+) -> tuple[float, float] | None:
+    match values:
+        case [int() | float() as tower_voltage, int() | float() as bus_voltage, *_]:
+            pass
+        case _:
+            return None
+
+    if tower_voltage < TOWER_MIN_VOLTAGE or bus_voltage < TOWER_MIN_VOLTAGE:
+        return None
+    return float(tower_voltage), float(bus_voltage)
+
+
+def is_tower_connected(
+    entity: Any, values: list[ApiResponseValue | None]
+) -> bool | None:
+    """Whether the tower is connected to the battery DC bus of the inverter.
+
+    Expects the tower voltage and the battery voltage measured by the inverter.
+    The BMS opens the contactor of a tower e.g. when it is deeply discharged,
+    the tower then keeps reporting its own voltage, which differs from the bus.
+    """
+    voltages = _tower_and_bus_voltage(values)
+    if voltages is None:
+        return None
+    tower_voltage, bus_voltage = voltages
+    return abs(tower_voltage - bus_voltage) < TOWER_DISCONNECTED_VOLTAGE_DIFFERENCE
+
+
+def get_tower_connection_attributes(
+    entity: Any, values: list[ApiResponseValue | None]
+) -> dict[str, Any]:
+    voltages = _tower_and_bus_voltage(values)
+    if voltages is None:
+        return {}
+    tower_voltage, bus_voltage = voltages
+    return {
+        "tower_voltage": round(tower_voltage, 1),
+        "bus_voltage": round(bus_voltage, 1),
+        "voltage_difference": round(tower_voltage - bus_voltage, 1),
+    }

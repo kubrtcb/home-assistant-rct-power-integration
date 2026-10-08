@@ -24,11 +24,15 @@ from .battery_module_helpers import (
     get_min_cell_temperature,
     get_min_cell_voltage,
     get_tower_cell_resistance_attributes,
+    get_tower_cell_status_attributes,
     get_tower_cell_voltage_attributes,
     get_tower_cell_voltage_spread,
+    get_tower_connection_attributes,
+    get_tower_flagged_cell_count,
     get_tower_max_cell_resistance,
     get_tower_max_cell_resistance_deviation,
     get_tower_weakest_cell_deviation,
+    is_tower_connected,
 )
 
 entity = MagicMock()
@@ -199,3 +203,40 @@ def test_tower_without_cell_data() -> None:
     assert get_tower_weakest_cell_deviation(entity, empty) is None
     assert get_tower_max_cell_resistance_deviation(entity, empty) is None
     assert get_tower_cell_voltage_attributes(entity, empty) == {}
+
+
+def test_tower_flagged_cells() -> None:
+    values = load_real_tower_values("cells")
+    # no cell of the real snapshot has a status flag
+    assert get_tower_flagged_cell_count(entity, values) == 0
+    assert get_tower_cell_status_attributes(entity, values)["flagged_cells"] == {}
+
+    flagged = [
+        decode_value(
+            DataType.BATTERY_MODULE_STATUS,
+            encode_module_status([(25, 3450, 0), (25, 3480, 4)]),
+        ),
+        *values[1:],
+    ]
+    assert get_tower_flagged_cell_count(entity, flagged) == 1
+    attributes = get_tower_cell_status_attributes(entity, flagged)
+    assert attributes["flagged_cells"] == {"M1/C2": 4}
+    assert attributes["flagged_cell_voltages"] == {"M1/C2": 3480}
+
+    assert get_tower_flagged_cell_count(entity, [None] * 6) is None
+
+
+def test_tower_connection() -> None:
+    # real snapshot of the slave: tower 2 was disconnected at 10 % SOC
+    assert is_tower_connected(entity, [396.25, 479.39]) is False
+    assert get_tower_connection_attributes(entity, [396.25, 479.39]) == {
+        "tower_voltage": 396.2,
+        "bus_voltage": 479.4,
+        "voltage_difference": -83.1,
+    }
+    assert is_tower_connected(entity, [478.68, 478.48]) is True
+
+    # no second tower or no bus voltage gives no answer
+    assert is_tower_connected(entity, [0.0, 478.48]) is None
+    assert is_tower_connected(entity, [478.68, None]) is None
+    assert get_tower_connection_attributes(entity, [None, None]) == {}

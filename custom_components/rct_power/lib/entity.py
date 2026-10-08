@@ -8,6 +8,10 @@ from decimal import Decimal
 from functools import cached_property
 from typing import Any
 
+from homeassistant.components.binary_sensor import (
+    BinarySensorEntity,
+    BinarySensorEntityDescription,
+)
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
@@ -220,8 +224,33 @@ class RctPowerBatteryModuleSensorEntity(RctPowerSensorEntity):
             "median_cell_resistance",
             "module_cell_voltages",
             "module_cell_resistances",
+            "flagged_cells",
+            "flagged_cell_voltages",
         }
     )
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        get_extra_state_attributes = self.entity_description.get_extra_state_attributes
+
+        if get_extra_state_attributes is None:
+            return None
+
+        return get_extra_state_attributes(self, self.get_valid_api_responses())
+
+
+class RctPowerBinarySensorEntity(BinarySensorEntity, RctPowerEntity):
+    entity_description: RctPowerBinarySensorEntityDescription  # pyright: ignore [reportIncompatibleVariableOverride]
+
+    def get_valid_api_responses(self) -> list[ApiResponseValue | None]:
+        return [
+            self.get_valid_api_response_value_by_id(object_info.object_id, None)
+            for object_info in self.object_infos
+        ]
+
+    @property
+    def is_on(self) -> bool | None:
+        return self.entity_description.get_is_on(self, self.get_valid_api_responses())
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
@@ -268,6 +297,22 @@ class RctPowerBatteryModuleSensorEntityDescription(RctPowerSensorEntityDescripti
     get_extra_state_attributes: (
         Callable[
             [RctPowerSensorEntity, list[ApiResponseValue | None]],
+            dict[str, Any],
+        ]
+        | None
+    ) = None
+
+
+@dataclass(frozen=True, kw_only=True)
+class RctPowerBinarySensorEntityDescription(
+    RctPowerEntityDescription, BinarySensorEntityDescription
+):
+    get_is_on: Callable[
+        [RctPowerBinarySensorEntity, list[ApiResponseValue | None]], bool | None
+    ]
+    get_extra_state_attributes: (
+        Callable[
+            [RctPowerBinarySensorEntity, list[ApiResponseValue | None]],
             dict[str, Any],
         ]
         | None
