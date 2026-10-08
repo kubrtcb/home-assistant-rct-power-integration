@@ -25,6 +25,12 @@ from .battery_module_helpers import (
     get_mean_cell_voltage,
     get_min_cell_temperature,
     get_min_cell_voltage,
+    get_tower_cell_resistance_attributes,
+    get_tower_cell_voltage_attributes,
+    get_tower_cell_voltage_spread,
+    get_tower_max_cell_resistance,
+    get_tower_max_cell_resistance_deviation,
+    get_tower_weakest_cell_deviation,
 )
 from .device_info_helpers import (
     get_battery_device_info,
@@ -476,6 +482,81 @@ def get_battery_module_sensor_entity_descriptions(
     return descriptions
 
 
+def get_battery_tower_cell_health_sensor_entity_descriptions(
+    object_prefix: str,
+    name_prefix: str,
+    get_device_info: Callable[[RctPowerEntity], DeviceInfo | None],
+) -> list[RctPowerSensorEntityDescription]:
+    """Sensors summarizing the cells of all modules of a battery tower.
+
+    Meant for long-term tracking: each is a single number with long-term
+    statistics, the affected cell position and all cell values are in the
+    (unrecorded) attributes.
+    """
+    cells_object_names = [
+        f"{object_prefix}.cells[{module_index}]"
+        for module_index in range(BATTERY_MODULE_COUNT)
+    ]
+    resist_object_names = [
+        f"{object_prefix}.cells_resist[{module_index}]"
+        for module_index in range(BATTERY_MODULE_COUNT)
+    ]
+
+    return [
+        RctPowerBatteryModuleSensorEntityDescription(
+            get_device_info=get_device_info,
+            key=f"{object_prefix}.cells.cell_voltage_spread",
+            object_names=cells_object_names,
+            unique_id=f"{object_prefix}-tower_cell_voltage_spread",
+            name=f"{name_prefix} Cell Voltage Spread",
+            update_priority=EntityUpdatePriority.INFREQUENT,
+            state_class=SensorStateClass.MEASUREMENT,
+            device_class=SensorDeviceClass.VOLTAGE,
+            native_unit_of_measurement=UnitOfElectricPotential.MILLIVOLT,
+            get_native_value=get_tower_cell_voltage_spread,
+            get_extra_state_attributes=get_tower_cell_voltage_attributes,
+        ),
+        RctPowerBatteryModuleSensorEntityDescription(
+            get_device_info=get_device_info,
+            key=f"{object_prefix}.cells.weakest_cell_deviation",
+            object_names=cells_object_names,
+            unique_id=f"{object_prefix}-tower_weakest_cell_deviation",
+            name=f"{name_prefix} Weakest Cell Deviation",
+            update_priority=EntityUpdatePriority.INFREQUENT,
+            state_class=SensorStateClass.MEASUREMENT,
+            device_class=SensorDeviceClass.VOLTAGE,
+            native_unit_of_measurement=UnitOfElectricPotential.MILLIVOLT,
+            suggested_display_precision=0,
+            get_native_value=get_tower_weakest_cell_deviation,
+            get_extra_state_attributes=get_tower_cell_voltage_attributes,
+        ),
+        RctPowerBatteryModuleSensorEntityDescription(
+            get_device_info=get_device_info,
+            key=f"{object_prefix}.cells_resist.max_cell_resistance",
+            object_names=resist_object_names,
+            unique_id=f"{object_prefix}-tower_max_cell_resistance",
+            name=f"{name_prefix} Max Cell Resistance",
+            update_priority=EntityUpdatePriority.STATIC,
+            state_class=SensorStateClass.MEASUREMENT,
+            native_unit_of_measurement="mΩ",
+            get_native_value=get_tower_max_cell_resistance,
+            get_extra_state_attributes=get_tower_cell_resistance_attributes,
+        ),
+        RctPowerBatteryModuleSensorEntityDescription(
+            get_device_info=get_device_info,
+            key=f"{object_prefix}.cells_resist.max_cell_resistance_deviation",
+            object_names=resist_object_names,
+            unique_id=f"{object_prefix}-tower_max_cell_resistance_deviation",
+            name=f"{name_prefix} Max Cell Resistance Deviation",
+            update_priority=EntityUpdatePriority.STATIC,
+            state_class=SensorStateClass.MEASUREMENT,
+            native_unit_of_measurement="%",
+            get_native_value=get_tower_max_cell_resistance_deviation,
+            get_extra_state_attributes=get_tower_cell_resistance_attributes,
+        ),
+    ]
+
+
 battery_tower_2_sensor_entity_descriptions: list[RctPowerSensorEntityDescription] = [
     RctPowerSensorEntityDescription(
         get_device_info=get_battery_tower_2_device_info,
@@ -570,6 +651,12 @@ battery_cell_sensor_entity_descriptions: list[RctPowerSensorEntityDescription] =
         "battery", "Battery", get_battery_device_info
     ),
     *get_battery_module_sensor_entity_descriptions(
+        "battery_placeholder[0]", "Battery Tower 2", get_battery_tower_2_device_info
+    ),
+    *get_battery_tower_cell_health_sensor_entity_descriptions(
+        "battery", "Battery", get_battery_device_info
+    ),
+    *get_battery_tower_cell_health_sensor_entity_descriptions(
         "battery_placeholder[0]", "Battery Tower 2", get_battery_tower_2_device_info
     ),
 ]

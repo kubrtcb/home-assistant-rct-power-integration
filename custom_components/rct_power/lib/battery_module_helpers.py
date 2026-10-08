@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from statistics import mean
+from statistics import mean, median
 from typing import Any, cast
 
 from homeassistant.components.sensor import SensorEntity
@@ -231,4 +231,133 @@ def get_cell_resistance_attributes(
             resistances, key=lambda cell_id: resistances[cell_id]
         )
         + 1,
+    }
+
+
+#
+# Whole tower, across all modules
+#
+def _cell_label(module_index: int, cell_id: int) -> str:
+    """1-based module/cell position, e.g. M3/C1."""
+    return f"M{module_index + 1}/C{cell_id + 1}"
+
+
+def _tower_cell_voltages(values: list[ApiResponseValue | None]) -> dict[str, int]:
+    """Cell voltages in mV of all modules, keyed by position."""
+    return {
+        _cell_label(module_index, cell_id): cell.voltage_mv
+        for module_index, value in enumerate(values)
+        for cell_id, cell in get_populated_cells(value).items()
+    }
+
+
+def _tower_cell_resistances(values: list[ApiResponseValue | None]) -> dict[str, float]:
+    """Cell resistances in mΩ of all modules, keyed by position."""
+    return {
+        _cell_label(module_index, cell_id): resistance
+        for module_index, value in enumerate(values)
+        for cell_id, resistance in get_populated_cell_resistances(value).items()
+    }
+
+
+def get_tower_cell_voltage_spread(
+    entity: SensorEntity, values: list[ApiResponseValue | None]
+) -> StateType:
+    """Difference between the highest and lowest cell of the tower in mV."""
+    voltages = _tower_cell_voltages(values)
+    if not voltages:
+        return None
+    return max(voltages.values()) - min(voltages.values())
+
+
+def get_tower_weakest_cell_deviation(
+    entity: SensorEntity, values: list[ApiResponseValue | None]
+) -> StateType:
+    """How far the lowest cell is below the median cell of the tower in mV.
+
+    Unlike the spread, a single cell drifting away from the others shows up
+    here regardless of which cell is the highest.
+    """
+    voltages = _tower_cell_voltages(values)
+    if not voltages:
+        return None
+    return round(median(voltages.values()) - min(voltages.values()), 1)
+
+
+def get_tower_cell_voltage_attributes(
+    entity: SensorEntity, values: list[ApiResponseValue | None]
+) -> dict[str, Any]:
+    voltages = _tower_cell_voltages(values)
+    if not voltages:
+        return {}
+
+    return {
+        "cell_count": len(voltages),
+        "median_cell_voltage": round(median(voltages.values()) / 1000, 4),
+        "max_voltage_cell": max(voltages, key=lambda label: voltages[label]),
+        "min_voltage_cell": min(voltages, key=lambda label: voltages[label]),
+        # one list per module, indexed by cell slot, in V
+        "module_cell_voltages": [
+            _positional(
+                {
+                    cell_id: round(cell.voltage_v, CELL_VOLTAGE_DECIMAL_DIGITS)
+                    for cell_id, cell in get_populated_cells(value).items()
+                },
+                len(value.cells),
+            )
+            if isinstance(value, BatteryModuleStatus)
+            else []
+            for value in values
+        ],
+    }
+
+
+def get_tower_max_cell_resistance(
+    entity: SensorEntity, values: list[ApiResponseValue | None]
+) -> StateType:
+    resistances = _tower_cell_resistances(values)
+    if not resistances:
+        return None
+    return round(max(resistances.values()), CELL_RESISTANCE_DECIMAL_DIGITS)
+
+
+def get_tower_max_cell_resistance_deviation(
+    entity: SensorEntity, values: list[ApiResponseValue | None]
+) -> StateType:
+    """How much the highest cell resistance exceeds the tower median in %."""
+    resistances = _tower_cell_resistances(values)
+    if not resistances:
+        return None
+    return round(
+        (max(resistances.values()) / median(resistances.values()) - 1) * 100, 1
+    )
+
+
+def get_tower_cell_resistance_attributes(
+    entity: SensorEntity, values: list[ApiResponseValue | None]
+) -> dict[str, Any]:
+    resistances = _tower_cell_resistances(values)
+    if not resistances:
+        return {}
+
+    return {
+        "median_cell_resistance": round(
+            median(resistances.values()), CELL_RESISTANCE_ATTRIBUTE_DECIMAL_DIGITS
+        ),
+        "max_resistance_cell": max(resistances, key=lambda label: resistances[label]),
+        # one list per module, indexed by cell slot, in mΩ
+        "module_cell_resistances": [
+            _positional(
+                {
+                    cell_id: round(resistance, CELL_RESISTANCE_ATTRIBUTE_DECIMAL_DIGITS)
+                    for cell_id, resistance in get_populated_cell_resistances(
+                        value
+                    ).items()
+                },
+                len(value.cells),
+            )
+            if isinstance(value, BatteryModuleResistance)
+            else []
+            for value in values
+        ],
     }

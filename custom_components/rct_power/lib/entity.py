@@ -210,6 +210,10 @@ class RctPowerBatteryModuleSensorEntity(RctPowerSensorEntity):
             "min_voltage_cell",
             "max_temperature_cell",
             "max_resistance_cell",
+            "median_cell_voltage",
+            "median_cell_resistance",
+            "module_cell_voltages",
+            "module_cell_resistances",
         }
     )
 

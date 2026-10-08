@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+import json
 import struct
+from pathlib import Path
 from unittest.mock import MagicMock
 
 from rctclient.registry import REGISTRY
 from rctclient.types import DataType
 from rctclient.utils import decode_value
 
-from .api import get_response_data_type
+from .api import ApiResponseValue, get_response_data_type
 from .battery_module_helpers import (
     get_cell_resistance_attributes,
     get_cell_status_attributes,
@@ -21,6 +23,12 @@ from .battery_module_helpers import (
     get_mean_cell_voltage,
     get_min_cell_temperature,
     get_min_cell_voltage,
+    get_tower_cell_resistance_attributes,
+    get_tower_cell_voltage_attributes,
+    get_tower_cell_voltage_spread,
+    get_tower_max_cell_resistance,
+    get_tower_max_cell_resistance_deviation,
+    get_tower_weakest_cell_deviation,
 )
 
 entity = MagicMock()
@@ -141,3 +149,53 @@ def test_second_tower_without_cell_data() -> None:
     assert get_cell_voltage_spread(entity, [value]) is None
     assert get_max_cell_temperature(entity, [value]) is None
     assert get_cell_status_attributes(entity, [value]) == {}
+
+
+def load_real_tower_values(kind: str) -> list[ApiResponseValue | None]:
+    """Decoded cells/cells_resist of all modules of a real, slightly unbalanced tower."""
+    payloads = json.loads(
+        (Path(__file__).parent / "testdata_tower_cells.json").read_text()
+    )
+    return [
+        decode_value(
+            get_response_data_type(REGISTRY.get_by_name(name).object_id),
+            bytes.fromhex(payloads[name]),
+        )
+        for name in (f"battery.{kind}[{index}]" for index in range(6))
+    ]
+
+
+def test_tower_cell_voltage_health() -> None:
+    values = load_real_tower_values("cells")
+
+    assert get_tower_cell_voltage_spread(entity, values) == 3279 - 3027
+    assert get_tower_weakest_cell_deviation(entity, values) == 3268 - 3027
+
+    attributes = get_tower_cell_voltage_attributes(entity, values)
+    assert attributes["cell_count"] == 144
+    assert attributes["min_voltage_cell"] == "M3/C1"
+    assert attributes["max_voltage_cell"] == "M1/C13"
+    assert attributes["module_cell_voltages"][2][0] == 3.027
+    assert len(attributes["module_cell_voltages"]) == 6
+
+
+def test_tower_cell_resistance_health() -> None:
+    values = load_real_tower_values("cells_resist")
+
+    assert get_tower_max_cell_resistance(entity, values) == 5.78
+
+    attributes = get_tower_cell_resistance_attributes(entity, values)
+    assert attributes["max_resistance_cell"] == "M6/C13"
+    assert attributes["module_cell_resistances"][2][0] == 5.75
+    assert get_tower_max_cell_resistance_deviation(entity, values) == round(
+        (5.78125 / attributes["median_cell_resistance"] - 1) * 100, 1
+    )
+
+
+def test_tower_without_cell_data() -> None:
+    empty = [None] * 6
+
+    assert get_tower_cell_voltage_spread(entity, empty) is None
+    assert get_tower_weakest_cell_deviation(entity, empty) is None
+    assert get_tower_max_cell_resistance_deviation(entity, empty) is None
+    assert get_tower_cell_voltage_attributes(entity, empty) == {}

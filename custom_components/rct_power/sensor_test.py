@@ -44,6 +44,12 @@ RAW_VALUES: dict[str, ApiResponseValue | bytes] = {
     "battery_placeholder[0].voltage": 463.9,
     "battery.cells[0]": encode_module_status([(21, 3301, 0), (24, 3312, 0)]),
     "battery_placeholder[0].cells[5]": encode_module_status([(30, 3280, 0)]),
+    **{
+        f"battery_placeholder[0].cells_resist[{index}]": encode_module_resistance(
+            [0.75, 0.75]
+        )
+        for index in range(5)
+    },
     "battery_placeholder[0].cells_resist[5]": encode_module_resistance([0.5, 1.0]),
 }
 
@@ -116,6 +122,14 @@ async def test_battery_module_sensors(hass: HomeAssistant) -> None:
 
     state = get_state(hass, "master_battery_tower_2_max_cell_voltage")
     assert state.state == "3.312"
+
+    state = get_state(hass, "master_battery_tower_2_max_cell_resistance_deviation")
+    assert state.state == "33.3"
+    assert state.attributes["max_resistance_cell"] == "M6/C2"
+
+    # modules 2-6 of the first tower have no data, so the tower has no value
+    state = get_state(hass, "master_battery_weakest_cell_deviation")
+    assert state.state == "unavailable"
 
     state = get_state(hass, "master_battery_tower_2_state_of_charge")
     assert state.state == "42.0"
