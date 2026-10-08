@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal, get_args
+from typing import Any, Literal, get_args
 
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.helpers.typing import StateType
@@ -118,6 +118,36 @@ def get_api_response_value_as_battery_status(
             return "normal"
         case _:
             return "other"
+
+
+def _get_first_battery_status_flag(
+    values: list[ApiResponseValue | None],
+) -> BatteryStatusFlag | None:
+    match values:
+        case [int() as first_value, *_]:
+            return BatteryStatusFlag(first_value)
+        case _:
+            return None
+
+
+def is_battery_balancing(
+    entity: Any, values: list[ApiResponseValue | None]
+) -> bool | None:
+    """Whether the balancing bit of the battery status is set."""
+    flags = _get_first_battery_status_flag(values)
+    if flags is None:
+        return None
+    return BatteryStatusFlag.balancing in flags
+
+
+def is_battery_calibrating(
+    entity: Any, values: list[ApiResponseValue | None]
+) -> bool | None:
+    """Whether the battery status reports a calibration (charging and discharging)."""
+    flags = _get_first_battery_status_flag(values)
+    if flags is None:
+        return None
+    return BatteryStatusFlag.calibrating in flags
 
 
 def get_first_api_response_value_as_battery_status(

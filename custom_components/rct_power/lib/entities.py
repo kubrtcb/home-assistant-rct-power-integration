@@ -3,11 +3,14 @@ from __future__ import annotations
 import re
 from collections.abc import Callable
 
+from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from homeassistant.const import (
     EntityCategory,
     UnitOfElectricPotential,
+    UnitOfPower,
     UnitOfTemperature,
+    UnitOfTime,
 )
 from homeassistant.helpers.device_registry import DeviceInfo
 from rctclient.registry import REGISTRY
@@ -25,12 +28,16 @@ from .battery_module_helpers import (
     get_mean_cell_voltage,
     get_min_cell_temperature,
     get_min_cell_voltage,
+    get_tower_flagged_cell_count,
     get_tower_cell_resistance_attributes,
+    get_tower_cell_status_attributes,
     get_tower_cell_voltage_attributes,
     get_tower_cell_voltage_spread,
     get_tower_max_cell_resistance,
     get_tower_max_cell_resistance_deviation,
+    get_tower_connection_attributes,
     get_tower_weakest_cell_deviation,
+    is_tower_connected,
 )
 from .device_info_helpers import (
     get_battery_device_info,
@@ -39,6 +46,7 @@ from .device_info_helpers import (
 )
 from .entity import (
     RctPowerBatteryModuleSensorEntityDescription,
+    RctPowerBinarySensorEntityDescription,
     RctPowerBitfieldSensorEntityDescription,
     RctPowerEntity,
     RctPowerSensorEntityDescription,
@@ -48,6 +56,8 @@ from .state_helpers import (
     get_first_api_response_value_as_absolute_state,
     get_first_api_response_value_as_battery_status,
     get_first_api_response_value_as_timestamp,
+    is_battery_balancing,
+    is_battery_calibrating,
     sum_api_response_values_as_state,
 )
 
@@ -262,6 +272,22 @@ battery_sensor_entity_descriptions: list[RctPowerSensorEntityDescription] = [
         update_priority=EntityUpdatePriority.INFREQUENT,
         device_class=SensorDeviceClass.TIMESTAMP,
         get_native_value=get_first_api_response_value_as_timestamp,
+    ),
+    RctPowerSensorEntityDescription(
+        get_device_info=get_battery_device_info,
+        key="power_mng.bat_calib_reqularity",
+        name="Battery Calibration Interval",
+        update_priority=EntityUpdatePriority.STATIC,
+        native_unit_of_measurement=UnitOfTime.DAYS,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    RctPowerSensorEntityDescription(
+        get_device_info=get_battery_device_info,
+        key="power_mng.calib_charge_power",
+        name="Battery Calibration Charge Power",
+        update_priority=EntityUpdatePriority.STATIC,
+        native_unit_of_measurement=UnitOfPower.WATT,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     RctPowerSensorEntityDescription(
         get_device_info=get_battery_device_info,
@@ -553,6 +579,18 @@ def get_battery_tower_cell_health_sensor_entity_descriptions(
             native_unit_of_measurement="%",
             get_native_value=get_tower_max_cell_resistance_deviation,
             get_extra_state_attributes=get_tower_cell_resistance_attributes,
+        ),
+        RctPowerBatteryModuleSensorEntityDescription(
+            get_device_info=get_device_info,
+            key=f"{object_prefix}.cells.flagged_cells",
+            object_names=cells_object_names,
+            unique_id=f"{object_prefix}-tower_flagged_cells",
+            name=f"{name_prefix} Flagged Cells",
+            icon="mdi:scale-balance",
+            update_priority=EntityUpdatePriority.INFREQUENT,
+            state_class=SensorStateClass.MEASUREMENT,
+            get_native_value=get_tower_flagged_cell_count,
+            get_extra_state_attributes=get_tower_cell_status_attributes,
         ),
     ]
 
@@ -1212,6 +1250,57 @@ bitfield_sensor_entity_descriptions: list[RctPowerBitfieldSensorEntityDescriptio
     ),
 ]
 
+def get_battery_tower_connection_entity_description(
+    object_prefix: str,
+    name_prefix: str,
+    get_device_info: Callable[[RctPowerEntity], DeviceInfo | None],
+) -> RctPowerBinarySensorEntityDescription:
+    """Whether the tower is connected to the battery DC bus of the inverter."""
+    return RctPowerBinarySensorEntityDescription(
+        get_device_info=get_device_info,
+        key=f"{object_prefix}.connected",
+        object_names=[f"{object_prefix}.voltage", "adc.u_acc"],
+        unique_id=f"{object_prefix}-tower_connected",
+        name=f"{name_prefix} Connection",
+        icon="mdi:battery-sync",
+        update_priority=EntityUpdatePriority.FREQUENT,
+        device_class=BinarySensorDeviceClass.CONNECTIVITY,
+        get_is_on=is_tower_connected,
+        get_extra_state_attributes=get_tower_connection_attributes,
+    )
+
+
+binary_sensor_entity_descriptions: list[RctPowerBinarySensorEntityDescription] = [
+    get_battery_tower_connection_entity_description(
+        "battery", "Battery", get_battery_device_info
+    ),
+    get_battery_tower_connection_entity_description(
+        "battery_placeholder[0]", "Battery Tower 2", get_battery_tower_2_device_info
+    ),
+    RctPowerBinarySensorEntityDescription(
+        get_device_info=get_battery_device_info,
+        key="battery.bat_status.balancing",
+        object_names=["battery.bat_status"],
+        unique_id="battery-status-balancing",
+        name="Battery Balancing",
+        icon="mdi:scale-balance",
+        update_priority=EntityUpdatePriority.FREQUENT,
+        device_class=BinarySensorDeviceClass.RUNNING,
+        get_is_on=is_battery_balancing,
+    ),
+    RctPowerBinarySensorEntityDescription(
+        get_device_info=get_battery_device_info,
+        key="battery.bat_status.calibrating",
+        object_names=["battery.bat_status"],
+        unique_id="battery-status-calibrating",
+        name="Battery Calibration",
+        icon="mdi:battery-sync-outline",
+        update_priority=EntityUpdatePriority.FREQUENT,
+        device_class=BinarySensorDeviceClass.RUNNING,
+        get_is_on=is_battery_calibrating,
+    ),
+]
+
 sensor_entity_descriptions = [
     *battery_sensor_entity_descriptions,
     *battery_tower_2_sensor_entity_descriptions,
@@ -1222,4 +1311,5 @@ sensor_entity_descriptions = [
 
 all_entity_descriptions = [
     *sensor_entity_descriptions,
+    *binary_sensor_entity_descriptions,
 ]
