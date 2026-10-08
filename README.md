@@ -233,7 +233,13 @@ master in a master/slave setup) and enable "Allow changing settings of this
 inverter". This adds the entity `number.<prefix>_grid_feed_power_limit`, which
 can be set between 0 W and the configured ceiling (9600 W by default).
 
-The inverter keeps this setting permanently, so the value is only written when
+The same option adds `number.<prefix>_external_power_reduction`
+(`buf_v_control.power_reduction`), which limits the inverter to a percentage of
+the solar plant peak power ("Generator Maximum Power"). On some setups only this
+external power reduction changes the actual output, while the feed-in limit in
+W is accepted but has no visible effect.
+
+The inverter keeps these settings permanently, so the value is only written when
 it changes and should not be changed every few seconds by an automation. The
 value read back from the inverter is shown in the entity and in the
 "Grid Maximum Feed Power" sensor.
