@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from unittest.mock import patch
 
+import pytest
 from homeassistant.const import CONF_PORT
 from homeassistant.core import HomeAssistant, State
 from homeassistant.helpers import device_registry as dr
@@ -86,7 +87,9 @@ def get_state(hass: HomeAssistant, entity_id_suffix: str) -> State:
     return state
 
 
-async def test_battery_module_sensors(hass: HomeAssistant) -> None:
+async def test_battery_module_sensors(
+    hass: HomeAssistant, caplog: pytest.LogCaptureFixture
+) -> None:
     config_entry = MockConfigEntry(
         domain=DOMAIN,
         data={
@@ -153,6 +156,12 @@ async def test_battery_module_sensors(hass: HomeAssistant) -> None:
     device = dr.async_get(hass).async_get(entity_entry.device_id)
     assert device is not None
     assert (DOMAIN, "BMS2") in device.identifiers
+
+    # battery towers hang off the inverter, linked without the deprecated via_device
+    inverter = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, "INV1")})
+    assert inverter is not None
+    assert device.via_device_id == inverter.id
+    assert "via_device" not in caplog.text
 
     # diagnostics expose decoded values and raw payloads
     diagnostics = await async_get_config_entry_diagnostics(hass, config_entry)

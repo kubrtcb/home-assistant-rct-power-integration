@@ -5,9 +5,11 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.entity import Entity
 
 from . import RctConfigEntry
+from .lib.device_info_helpers import get_inverter_device_info
 from .lib.entities import (
     battery_cell_sensor_entity_descriptions,
     battery_sensor_entity_descriptions,
@@ -75,6 +77,12 @@ async def async_setup_entry(
         )
         for entity_description in bitfield_sensor_entity_descriptions
     ]
+
+    # the battery devices refer to the inverter device by its registry id
+    dr.async_get(hass).async_get_or_create(
+        config_entry_id=entry.entry_id,
+        **get_inverter_device_info(inverter_sensor_entities[0]),
+    )
 
     async_add_entities(
         [

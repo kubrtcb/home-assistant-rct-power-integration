@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import DeviceInfo
 
 from ..const import BATTERY_MODEL, DOMAIN, INVERTER_MODEL, NAME
@@ -16,6 +17,18 @@ def get_inverter_sn(entity: RctPowerEntity) -> str:
     if inverter_sn:
         return str(inverter_sn)
     return str(entity.config_entry.unique_id or entity.config_entry.entry_id)
+
+
+def get_inverter_device_id(entity: RctPowerEntity) -> dict[str, str]:
+    """Link a battery device to the inverter device, if it is registered.
+
+    The sensor platform registers the inverter device before adding any
+    entities, so it is normally found.
+    """
+    device = dr.async_get(entity.hass).async_get_device(
+        identifiers={(DOMAIN, get_inverter_sn(entity))}
+    )
+    return {"via_device_id": device.id} if device else {}
 
 
 def get_inverter_device_info(entity: RctPowerEntity) -> DeviceInfo:
@@ -68,10 +81,7 @@ def get_battery_device_info(entity: RctPowerEntity) -> DeviceInfo:
         ),
         model=BATTERY_MODEL,
         manufacturer=NAME,
-        via_device=(
-            DOMAIN,
-            inverter_sn,
-        ),
+        **get_inverter_device_id(entity),
     )
 
 
@@ -104,8 +114,5 @@ def get_battery_tower_2_device_info(entity: RctPowerEntity) -> DeviceInfo:
         ),
         model=BATTERY_MODEL,
         manufacturer=NAME,
-        via_device=(
-            DOMAIN,
-            inverter_sn,
-        ),
+        **get_inverter_device_id(entity),
     )
