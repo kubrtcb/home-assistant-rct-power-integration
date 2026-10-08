@@ -39,6 +39,8 @@ RAW_VALUES: dict[str, ApiResponseValue | bytes] = {
     "inverter_sn": "INV1",
     "android_description": "Master",
     "battery.bms_sn": "BMS1",
+    # an inverter without an external generator reports inf here
+    "energy.e_ext_total": float("inf"),
     "battery_placeholder[0].bms_sn": "BMS2",
     "battery_placeholder[0].max_cell_voltage": 3.312,
     "battery_placeholder[0].soc": 0.42,
@@ -162,6 +164,10 @@ async def test_battery_module_sensors(
     assert inverter is not None
     assert device.via_device_id == inverter.id
     assert "via_device" not in caplog.text
+
+    state = get_state(hass, "external_energy_production_total")
+    assert state.state == "unknown"
+    assert "non-finite" not in caplog.text
 
     # diagnostics expose decoded values and raw payloads
     diagnostics = await async_get_config_entry_diagnostics(hass, config_entry)
