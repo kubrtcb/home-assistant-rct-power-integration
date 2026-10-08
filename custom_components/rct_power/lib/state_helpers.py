@@ -6,6 +6,11 @@ from typing import Literal, get_args
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.helpers.typing import StateType
 from homeassistant.util.dt import as_local
+from rctclient.types import (
+    BatteryModuleResistance,
+    BatteryModuleStatistics,
+    BatteryModuleStatus,
+)
 
 from .api import ApiResponseValue
 from .const import (
@@ -32,7 +37,15 @@ def get_api_response_value_as_state(
     if isinstance(value, bytes):
         return value.hex()
 
-    if isinstance(value, tuple):
+    if isinstance(
+        value,
+        (
+            tuple,
+            BatteryModuleStatus,
+            BatteryModuleStatistics,
+            BatteryModuleResistance,
+        ),
+    ):
         return None
 
     if isinstance(value, (int, float)) and entity.native_unit_of_measurement == "%":

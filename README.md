@@ -135,6 +135,30 @@ depending on your preference.
 | Battery Status                           |      | the current battery status (incomplete)                                       |
 | Next Battery Calibration Date            |      | the date and time of the next planned battery calibration                     |
 
+### Battery towers, modules and cells
+
+An inverter can have two battery towers. The second tower shows up as a
+separate device called "Battery Tower 2". Entities of the second tower are
+prefixed with `Battery Tower 2` instead of `Battery`.
+
+| Entity name                           | Unit | Description                                                               |
+| ------------------------------------- | ---- | ------------------------------------------------------------------------- |
+| Battery Max/Min Cell Voltage          | V    | the highest/lowest cell voltage of the tower as reported by its BMS       |
+| Battery Max/Min Cell Temperature      | °C   | the highest/lowest cell temperature of the tower as reported by its BMS   |
+| Battery Module N Cycles               |      | the recorded cycles of module N                                           |
+| Battery Module N Max Cell Voltage     | V    | the highest cell voltage of module N, all cells in the attributes         |
+| Battery Module N Min Cell Voltage     | V    | the lowest cell voltage of module N                                       |
+| Battery Module N Mean Cell Voltage    | V    | the mean cell voltage of module N (disabled by default)                   |
+| Battery Module N Cell Voltage Spread  | mV   | the difference between the highest and lowest cell voltage of module N    |
+| Battery Module N Max Cell Temperature | °C   | the highest cell temperature of module N                                  |
+| Battery Module N Min Cell Temperature | °C   | the lowest cell temperature of module N (disabled by default)             |
+| Battery Module N Max Cell Resistance  | mΩ   | the highest internal cell resistance of module N, all cells in attributes |
+| Battery Module N Mean Cell Resistance | mΩ   | the mean internal cell resistance of module N                             |
+
+The per-cell values (`cell_voltages`, `cell_temperatures`, `cell_status`,
+`cell_resistances`) are exposed as attributes and are not recorded in the
+history database.
+
 ### Household consumers and producers
 
 | Entity name                                      | Unit | Description                                                            |

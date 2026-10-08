@@ -9,11 +9,18 @@ from homeassistant.helpers.entity import Entity
 
 from . import RctConfigEntry
 from .lib.entities import (
+    battery_cell_sensor_entity_descriptions,
     battery_sensor_entity_descriptions,
+    battery_tower_2_sensor_entity_descriptions,
     bitfield_sensor_entity_descriptions,
     inverter_sensor_entity_descriptions,
 )
-from .lib.entity import RctPowerBitfieldSensorEntity, RctPowerSensorEntity
+from .lib.entity import (
+    RctPowerBatteryModuleSensorEntity,
+    RctPowerBatteryModuleSensorEntityDescription,
+    RctPowerBitfieldSensorEntity,
+    RctPowerSensorEntity,
+)
 
 
 async def async_setup_entry(
@@ -31,6 +38,24 @@ async def async_setup_entry(
             entity_description=entity_description,
         )
         for entity_description in battery_sensor_entity_descriptions
+    ]
+
+    battery_cell_sensor_entities = [
+        (
+            RctPowerBatteryModuleSensorEntity
+            if isinstance(
+                entity_description, RctPowerBatteryModuleSensorEntityDescription
+            )
+            else RctPowerSensorEntity
+        )(
+            coordinators=list(data.update_coordinators.values()),
+            config_entry=entry,
+            entity_description=entity_description,
+        )
+        for entity_description in [
+            *battery_tower_2_sensor_entity_descriptions,
+            *battery_cell_sensor_entity_descriptions,
+        ]
     ]
 
     inverter_sensor_entities = [
@@ -54,6 +79,7 @@ async def async_setup_entry(
     async_add_entities(
         [
             *battery_sensor_entities,
+            *battery_cell_sensor_entities,
             *inverter_sensor_entities,
             *bitfield_sensor_entities,
         ]

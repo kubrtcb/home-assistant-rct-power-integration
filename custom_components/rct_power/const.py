@@ -15,6 +15,7 @@ PLATFORMS: Final = [Platform.SENSOR]
 NAME: Final = "RCT Power"
 INVERTER_MODEL: Final = "RCT Power Storage"
 BATTERY_MODEL: Final = "RCT Power Battery"
+BATTERY_MODULE_COUNT: Final = 6
 
 
 class EntityUpdatePriority(Enum):

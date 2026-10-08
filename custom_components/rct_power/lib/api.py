@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import struct
 from asyncio import StreamReader, StreamWriter, open_connection
 from asyncio.locks import Lock
@@ -13,7 +14,14 @@ from homeassistant.helpers.update_coordinator import UpdateFailed
 from rctclient.exceptions import FrameCRCMismatch, FrameLengthExceeded, InvalidCommand
 from rctclient.frame import ReceiveFrame, SendFrame
 from rctclient.registry import REGISTRY
-from rctclient.types import Command, EventEntry
+from rctclient.types import (
+    BatteryModuleResistance,
+    BatteryModuleStatistics,
+    BatteryModuleStatus,
+    Command,
+    DataType,
+    EventEntry,
+)
 from rctclient.utils import decode_value
 
 from ..const import LOGGER
@@ -30,7 +38,32 @@ type ApiResponseValue = (
     | str
     | tuple[datetime, dict[datetime, int]]
     | tuple[datetime, dict[datetime, EventEntry]]
+    | BatteryModuleStatus
+    | BatteryModuleStatistics
+    | BatteryModuleResistance
 )
+
+# The registry lists some objects of the second battery tower
+# (`battery_placeholder[0]`) as strings, although they carry the same payload
+# as their counterparts of the first tower (`battery`).
+_RESPONSE_DATA_TYPE_OVERRIDE_PATTERNS: dict[str, DataType] = {
+    r"^battery_placeholder\[0\]\.cells\[\d+\]$": DataType.BATTERY_MODULE_STATUS,
+    r"^battery_placeholder\[0\]\.cells_stat\[\d+\]$": DataType.BATTERY_MODULE_STATISTICS,
+    r"^battery_placeholder\[0\]\.cells_resist\[\d+\]$": DataType.BATTERY_MODULE_RESISTANCE,
+}
+
+RESPONSE_DATA_TYPE_OVERRIDES: dict[int, DataType] = {
+    object_info.object_id: data_type
+    for object_info in REGISTRY.all()
+    for pattern, data_type in _RESPONSE_DATA_TYPE_OVERRIDE_PATTERNS.items()
+    if re.match(pattern, object_info.name)
+}
+
+
+def get_response_data_type(object_id: int) -> DataType:
+    return RESPONSE_DATA_TYPE_OVERRIDES.get(
+        object_id, REGISTRY.get_by_id(object_id).response_data_type
+    )
 
 
 @dataclass
@@ -132,7 +165,7 @@ class RctPowerApiClient:
 
                     if response_frame.complete():
                         response_object_info = REGISTRY.get_by_id(response_frame.id)
-                        data_type = response_object_info.response_data_type
+                        data_type = get_response_data_type(response_frame.id)
                         received_object_name = response_object_info.name
 
                         # ignore, if this is not the answer to the latest request
