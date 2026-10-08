@@ -45,6 +45,10 @@ RAW_VALUES: dict[str, ApiResponseValue | bytes] = {
     "battery_placeholder[0].max_cell_voltage": 3.312,
     "battery_placeholder[0].soc": 0.42,
     "battery_placeholder[0].voltage": 463.9,
+    # tower 2 is disconnected from the DC bus, tower 1 is balancing
+    "adc.u_acc": 479.4,
+    "battery.voltage": 479.3,
+    "battery.bat_status": 2**11,
     "battery.cells[0]": encode_module_status([(21, 3301, 0), (24, 3312, 0)]),
     "battery_placeholder[0].cells[5]": encode_module_status([(30, 3280, 0)]),
     **{
@@ -164,6 +168,21 @@ async def test_battery_module_sensors(
     assert inverter is not None
     assert device.via_device_id == inverter.id
     assert "via_device" not in caplog.text
+
+    def get_binary_state(entity_id_suffix: str) -> State:
+        [state] = [
+            state
+            for state in hass.states.async_all("binary_sensor")
+            if state.entity_id.endswith(f"_{entity_id_suffix}")
+        ]
+        return state
+
+    state = get_binary_state("master_battery_tower_2_connection")
+    assert state.state == "off"
+    assert state.attributes["voltage_difference"] == -15.5
+    assert get_binary_state("master_battery_connection").state == "on"
+    assert get_binary_state("master_battery_balancing").state == "on"
+    assert get_binary_state("master_battery_calibration").state == "off"
 
     state = get_state(hass, "external_energy_production_total")
     assert state.state == "unknown"

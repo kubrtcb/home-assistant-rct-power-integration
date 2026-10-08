@@ -224,6 +224,8 @@ class RctPowerBatteryModuleSensorEntity(RctPowerSensorEntity):
             "median_cell_resistance",
             "module_cell_voltages",
             "module_cell_resistances",
+            "flagged_cells",
+            "flagged_cell_voltages",
         }
     )
 
