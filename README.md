@@ -146,6 +146,10 @@ An inverter can have two battery towers. The second tower shows up as a
 separate device called "Battery Tower 2". Entities of the second tower are
 prefixed with `Battery Tower 2` instead of `Battery`.
 
+The second tower additionally has its own pack values: `Battery Tower 2 State
+of Charge`, `Voltage`, `Current`, `Temperature`, `Charge Capacity`, `State of
+Health` and `Maximum Charging/Discharging Current`.
+
 | Entity name                           | Unit | Description                                                               |
 | ------------------------------------- | ---- | ------------------------------------------------------------------------- |
 | Battery Max/Min Cell Voltage          | V    | the highest/lowest cell voltage of the tower as reported by its BMS       |
