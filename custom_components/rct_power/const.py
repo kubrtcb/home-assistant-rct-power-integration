@@ -30,10 +30,8 @@ CONF_HOSTNAME: Final = "hostname"
 
 # writing settings to the inverter, off by default
 CONF_ALLOW_WRITES: Final = "allow_writes"
-CONF_GRID_FEED_POWER_MAX: Final = "grid_feed_power_max"
 
 DEFAULT_ENTITY_PREFIX: Final = "RCT Power Storage"
-DEFAULT_GRID_FEED_POWER_MAX: Final = 9600
 DEFAULT_PORT: Final = 8899
 
 

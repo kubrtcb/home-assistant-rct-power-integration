@@ -13,4 +13,3 @@ class RctConfEntryOptions(TypedDict, total=False):
     infrequent_scan_interval: int
     static_scan_interval: int
     allow_writes: bool
-    grid_feed_power_max: int

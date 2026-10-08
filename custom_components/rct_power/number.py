@@ -8,21 +8,20 @@ from dataclasses import dataclass
 from typing import cast
 
 from homeassistant.components.number import (
-    NumberDeviceClass,
     NumberEntity,
     NumberEntityDescription,
     NumberMode,
 )
-from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfPower
+from homeassistant.const import PERCENTAGE, EntityCategory, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity import Entity
 
 from . import RctConfigEntry
 from .const import (
     CONF_ALLOW_WRITES,
-    CONF_GRID_FEED_POWER_MAX,
-    DEFAULT_GRID_FEED_POWER_MAX,
+    DOMAIN,
     EntityUpdatePriority,
 )
 from .lib.api import ValidApiResponse
@@ -39,44 +38,24 @@ class RctPowerNumberEntityDescription(
     scale: float = 1
 
 
-def get_number_entity_descriptions(
-    options: RctConfEntryOptions,
-) -> list[RctPowerNumberEntityDescription]:
-    return [
-        RctPowerNumberEntityDescription(
-            get_device_info=get_inverter_device_info,
-            key="buf_v_control.power_reduction_max_solar_grid",
-            unique_id="grid_feed_power_limit",
-            name="Grid Feed Power Limit",
-            icon="mdi:transmission-tower-export",
-            update_priority=EntityUpdatePriority.STATIC,
-            device_class=NumberDeviceClass.POWER,
-            native_unit_of_measurement=UnitOfPower.WATT,
-            native_min_value=0,
-            native_max_value=options.get(
-                CONF_GRID_FEED_POWER_MAX, DEFAULT_GRID_FEED_POWER_MAX
-            ),
-            native_step=100,
-            mode=NumberMode.BOX,
-            entity_category=EntityCategory.CONFIG,
-        ),
-        # the inverter takes a fraction of the solar plant peak power
-        RctPowerNumberEntityDescription(
-            get_device_info=get_inverter_device_info,
-            key="buf_v_control.power_reduction",
-            unique_id="external_power_reduction",
-            name="External Power Reduction",
-            icon="mdi:solar-power-variant",
-            update_priority=EntityUpdatePriority.INFREQUENT,
-            native_unit_of_measurement=PERCENTAGE,
-            native_min_value=0,
-            native_max_value=100,
-            native_step=1,
-            scale=100,
-            mode=NumberMode.BOX,
-            entity_category=EntityCategory.CONFIG,
-        ),
-    ]
+number_entity_descriptions: list[RctPowerNumberEntityDescription] = [
+    # the inverter takes a fraction of the solar plant peak power
+    RctPowerNumberEntityDescription(
+        get_device_info=get_inverter_device_info,
+        key="buf_v_control.power_reduction",
+        unique_id="external_power_reduction",
+        name="External Power Reduction",
+        icon="mdi:solar-power-variant",
+        update_priority=EntityUpdatePriority.INFREQUENT,
+        native_unit_of_measurement=PERCENTAGE,
+        native_min_value=0,
+        native_max_value=100,
+        native_step=1,
+        scale=100,
+        mode=NumberMode.BOX,
+        entity_category=EntityCategory.CONFIG,
+    ),
+]
 
 
 class RctPowerNumberEntity(NumberEntity, RctPowerEntity):
@@ -134,6 +113,13 @@ async def async_setup_entry(
     if not options.get(CONF_ALLOW_WRITES, False):
         return
 
+    # the feed-in limit in W was accepted by the inverter but had no effect
+    entity_registry = er.async_get(hass)
+    if entity_id := entity_registry.async_get_entity_id(
+        Platform.NUMBER, DOMAIN, f"{entry.entry_id}-grid_feed_power_limit"
+    ):
+        entity_registry.async_remove(entity_id)
+
     data = entry.runtime_data
 
     async_add_entities(
@@ -143,6 +129,6 @@ async def async_setup_entry(
                 config_entry=entry,
                 entity_description=entity_description,
             )
-            for entity_description in get_number_entity_descriptions(options)
+            for entity_description in number_entity_descriptions
         ]
     )
