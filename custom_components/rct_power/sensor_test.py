@@ -180,6 +180,7 @@ async def test_battery_module_sensors(
     state = get_binary_state("master_battery_tower_2_connection")
     assert state.state == "off"
     assert state.attributes["voltage_difference"] == -15.5
+    assert "unit_of_measurement" not in state.attributes
     assert get_binary_state("master_battery_connection").state == "on"
     assert get_binary_state("master_battery_balancing").state == "on"
     assert get_binary_state("master_battery_calibration").state == "off"

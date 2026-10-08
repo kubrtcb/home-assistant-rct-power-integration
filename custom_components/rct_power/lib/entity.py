@@ -242,6 +242,11 @@ class RctPowerBatteryModuleSensorEntity(RctPowerSensorEntity):
 class RctPowerBinarySensorEntity(BinarySensorEntity, RctPowerEntity):
     entity_description: RctPowerBinarySensorEntityDescription  # pyright: ignore [reportIncompatibleVariableOverride]
 
+    @cached_property
+    def unit_of_measurement(self) -> str | None:
+        # the voltage objects the state is derived from don't make it a voltage
+        return None
+
     def get_valid_api_responses(self) -> list[ApiResponseValue | None]:
         return [
             self.get_valid_api_response_value_by_id(object_info.object_id, None)
