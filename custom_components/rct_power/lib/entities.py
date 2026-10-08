@@ -28,14 +28,14 @@ from .battery_module_helpers import (
     get_mean_cell_voltage,
     get_min_cell_temperature,
     get_min_cell_voltage,
-    get_tower_flagged_cell_count,
     get_tower_cell_resistance_attributes,
     get_tower_cell_status_attributes,
     get_tower_cell_voltage_attributes,
     get_tower_cell_voltage_spread,
+    get_tower_connection_attributes,
+    get_tower_flagged_cell_count,
     get_tower_max_cell_resistance,
     get_tower_max_cell_resistance_deviation,
-    get_tower_connection_attributes,
     get_tower_weakest_cell_deviation,
     is_tower_connected,
 )
@@ -1249,6 +1249,7 @@ bitfield_sensor_entity_descriptions: list[RctPowerBitfieldSensorEntityDescriptio
         options=available_battery_status,
     ),
 ]
+
 
 def get_battery_tower_connection_entity_description(
     object_prefix: str,
