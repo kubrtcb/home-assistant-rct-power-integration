@@ -10,7 +10,7 @@ LOGGER = logging.getLogger(__package__)
 
 DOMAIN: Final = "rct_power"
 ICON: Final = "mdi:solar-power"
-PLATFORMS: Final = [Platform.SENSOR]
+PLATFORMS: Final = [Platform.NUMBER, Platform.SENSOR]
 
 NAME: Final = "RCT Power"
 INVERTER_MODEL: Final = "RCT Power Storage"
@@ -28,7 +28,12 @@ class EntityUpdatePriority(Enum):
 CONF_ENTITY_PREFIX: Final = "entity_prefix"
 CONF_HOSTNAME: Final = "hostname"
 
+# writing settings to the inverter, off by default
+CONF_ALLOW_WRITES: Final = "allow_writes"
+CONF_GRID_FEED_POWER_MAX: Final = "grid_feed_power_max"
+
 DEFAULT_ENTITY_PREFIX: Final = "RCT Power Storage"
+DEFAULT_GRID_FEED_POWER_MAX: Final = 9600
 DEFAULT_PORT: Final = 8899
 
 
