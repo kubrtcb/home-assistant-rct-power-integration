@@ -13,6 +13,8 @@ from typing import cast
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PORT
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 from homeassistant.util.hass_dict import HassEntryKey
 
 from .const import (
@@ -120,3 +122,20 @@ async def async_unload_entry(hass: HomeAssistant, entry: RctConfigEntry) -> bool
 async def async_reload_entry(hass: HomeAssistant, entry: RctConfigEntry) -> None:
     """Reload config entry."""
     await hass.config_entries.async_reload(entry.entry_id)
+
+
+async def async_remove_config_entry_device(
+    hass: HomeAssistant, entry: RctConfigEntry, device_entry: dr.DeviceEntry
+) -> bool:
+    """Allow removing a device only if none of its entities is available.
+
+    Devices can be orphaned when a serial number changes or could not be read.
+    """
+    entity_registry = er.async_get(hass)
+    for entity_entry in er.async_entries_for_device(
+        entity_registry, device_entry.id, include_disabled_entities=True
+    ):
+        state = hass.states.get(entity_entry.entity_id)
+        if state is not None and state.state != "unavailable":
+            return False
+    return True

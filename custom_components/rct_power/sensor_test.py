@@ -13,6 +13,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from rctclient.registry import REGISTRY
 from rctclient.utils import decode_value
 
+from custom_components.rct_power import async_remove_config_entry_device
 from custom_components.rct_power.const import (
     CONF_ENTITY_PREFIX,
     CONF_HOSTNAME,
@@ -137,3 +138,47 @@ async def test_battery_module_sensors(hass: HomeAssistant) -> None:
     assert tower_2_cells["raw"] == RAW_VALUES["battery_placeholder[0].cells[5]"].hex()  # type: ignore
     assert tower_2_cells["value"]["cells"]["0"]["voltage_mv"] == 3280
     assert diagnostics["objects"]["battery.cells[1]"]["valid"] is False
+
+    # devices with live entities can't be removed, orphaned ones can
+    assert not await async_remove_config_entry_device(hass, config_entry, device)
+    orphan = dr.async_get(hass).async_get_or_create(
+        config_entry_id=config_entry.entry_id, identifiers={(DOMAIN, "None")}
+    )
+    assert await async_remove_config_entry_device(hass, config_entry, orphan)
+
+
+async def test_device_without_serial_numbers(hass: HomeAssistant) -> None:
+    """A failed serial number read must not create a device called "None"."""
+    config_entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            CONF_HOSTNAME: "localhost",
+            CONF_PORT: DEFAULT_PORT,
+            CONF_ENTITY_PREFIX: "Master",
+        },
+        entry_id="test",
+        unique_id="INV-FROM-FLOW",
+    )
+    config_entry.add_to_hass(hass)
+
+    async def no_data(object_ids: list[int]) -> RctPowerData:
+        return {}
+
+    with patch(
+        "custom_components.rct_power.RctPowerApiClient.async_get_data",
+        side_effect=no_data,
+    ):
+        assert await hass.config_entries.async_setup(config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    identifiers = {
+        identifier
+        for device in dr.async_entries_for_config_entry(
+            dr.async_get(hass), config_entry.entry_id
+        )
+        for identifier in device.identifiers
+    }
+    assert (DOMAIN, "None") not in identifiers
+    assert (DOMAIN, "INV-FROM-FLOW") in identifiers
+    assert (DOMAIN, "INV-FROM-FLOW-tower-1") in identifiers
+    assert (DOMAIN, "INV-FROM-FLOW-tower-2") in identifiers
