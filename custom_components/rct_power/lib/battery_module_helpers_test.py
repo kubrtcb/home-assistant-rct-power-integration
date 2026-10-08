@@ -111,3 +111,33 @@ def test_second_tower_uses_module_data_types() -> None:
     )
     assert data_type_of("battery.cells[3]") == DataType.BATTERY_MODULE_STATUS
     assert data_type_of("battery_placeholder[0].module_sn[3]") == DataType.STRING
+
+
+# Captured from a real RCT Power Storage 10 diagnostics download.
+_REAL_TOWER_2_MODULE_1_CELLS = bytes.fromhex(
+    "14960c0014970c00159a0c0015990c00158e0c00159a0c0015930c0015990c00"
+    "15940c0015990c0015970c00159a0c00168e0c00169f0c00169d0c0016990c00"
+    "16970c0015930c00159a0c00159c0c0015930c00159a0c0015990c00159a0c00"
+)
+
+
+def test_second_tower_decodes_real_payload() -> None:
+    object_id = REGISTRY.get_by_name("battery_placeholder[0].cells[0]").object_id
+    value = decode_value(
+        get_response_data_type(object_id), _REAL_TOWER_2_MODULE_1_CELLS
+    )
+
+    assert get_min_cell_voltage(entity, [value]) == 3.214
+    assert get_max_cell_voltage(entity, [value]) == 3.231
+    assert get_max_cell_temperature(entity, [value]) == 22
+    assert get_cell_status_attributes(entity, [value])["cell_count"] == 24
+
+
+def test_second_tower_without_cell_data() -> None:
+    object_id = REGISTRY.get_by_name("battery_placeholder[0].cells[0]").object_id
+    value = decode_value(get_response_data_type(object_id), bytes(96))
+
+    assert get_min_cell_voltage(entity, [value]) is None
+    assert get_cell_voltage_spread(entity, [value]) is None
+    assert get_max_cell_temperature(entity, [value]) is None
+    assert get_cell_status_attributes(entity, [value]) == {}
