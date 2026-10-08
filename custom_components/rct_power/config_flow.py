@@ -14,10 +14,8 @@ from homeassistant.core import callback
 from .const import (
     CONF_ALLOW_WRITES,
     CONF_ENTITY_PREFIX,
-    CONF_GRID_FEED_POWER_MAX,
     CONF_HOSTNAME,
     DEFAULT_ENTITY_PREFIX,
-    DEFAULT_GRID_FEED_POWER_MAX,
     DEFAULT_PORT,
     DOMAIN,
     ConfScanInterval,
@@ -121,8 +119,5 @@ OPTIONS_SCHEMA = vol.Schema(
         ): cv.positive_int,
         # only enable on the inverter that controls the plant (the master)
         vol.Optional(CONF_ALLOW_WRITES, default=False): bool,
-        vol.Optional(
-            CONF_GRID_FEED_POWER_MAX, default=DEFAULT_GRID_FEED_POWER_MAX
-        ): cv.positive_int,
     }
 )

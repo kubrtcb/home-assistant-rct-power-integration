@@ -1,4 +1,4 @@
-"""Test writing the grid feed-in limit."""
+"""Test writing the external power reduction."""
 
 from __future__ import annotations
 
@@ -16,30 +16,26 @@ from homeassistant.components.number import (
 from homeassistant.const import ATTR_ENTITY_ID, CONF_PORT
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from rctclient.registry import REGISTRY
 
 from custom_components.rct_power.const import (
     CONF_ALLOW_WRITES,
     CONF_ENTITY_PREFIX,
-    CONF_GRID_FEED_POWER_MAX,
     CONF_HOSTNAME,
     DEFAULT_PORT,
     DOMAIN,
 )
 from custom_components.rct_power.lib.api import RctPowerData, ValidApiResponse
 
-LIMIT_ID = REGISTRY.get_by_name(
-    "buf_v_control.power_reduction_max_solar_grid"
-).object_id
-ENTITY_ID = "number.master_grid_feed_power_limit"
 REDUCTION_ID = REGISTRY.get_by_name("buf_v_control.power_reduction").object_id
-REDUCTION_ENTITY_ID = "number.master_external_power_reduction"
+ENTITY_ID = "number.master_external_power_reduction"
 
 
-def response(value: float, object_id: int = LIMIT_ID) -> ValidApiResponse:
+def response(value: float) -> ValidApiResponse:
     return ValidApiResponse(
-        object_id=object_id, time=datetime.now(tz=UTC), value=value, raw=None
+        object_id=REDUCTION_ID, time=datetime.now(tz=UTC), value=value, raw=None
     )
 
 
@@ -55,14 +51,12 @@ async def fake_get_data(object_ids: list[int]) -> RctPowerData:
             data[object_id] = ValidApiResponse(
                 object_id=object_id, time=datetime.now(tz=UTC), value="Master", raw=None
             )
-        elif object_id == LIMIT_ID:
-            data[object_id] = response(9600.0)
         elif object_id == REDUCTION_ID:
-            data[object_id] = response(1.0, REDUCTION_ID)
+            data[object_id] = response(1.0)
     return data
 
 
-async def setup(hass: HomeAssistant, options: dict) -> MockConfigEntry:
+def create_entry(hass: HomeAssistant, options: dict) -> MockConfigEntry:
     config_entry = MockConfigEntry(
         domain=DOMAIN,
         data={
@@ -74,7 +68,10 @@ async def setup(hass: HomeAssistant, options: dict) -> MockConfigEntry:
         entry_id="test",
     )
     config_entry.add_to_hass(hass)
+    return config_entry
 
+
+async def setup(hass: HomeAssistant, config_entry: MockConfigEntry) -> None:
     with patch(
         "custom_components.rct_power.RctPowerApiClient.async_get_data",
         side_effect=fake_get_data,
@@ -82,96 +79,80 @@ async def setup(hass: HomeAssistant, options: dict) -> MockConfigEntry:
         assert await hass.config_entries.async_setup(config_entry.entry_id)
         await hass.async_block_till_done()
 
-    return config_entry
 
-
-async def set_value(
-    hass: HomeAssistant, value: float, entity_id: str = ENTITY_ID
-) -> None:
+async def set_value(hass: HomeAssistant, value: float) -> None:
     await hass.services.async_call(
         NUMBER_DOMAIN,
         SERVICE_SET_VALUE,
-        {ATTR_ENTITY_ID: entity_id, ATTR_VALUE: value},
+        {ATTR_ENTITY_ID: ENTITY_ID, ATTR_VALUE: value},
         blocking=True,
     )
 
 
 async def test_no_number_without_allow_writes(hass: HomeAssistant) -> None:
-    await setup(hass, {})
+    await setup(hass, create_entry(hass, {}))
     assert hass.states.async_all(NUMBER_DOMAIN) == []
-
-
-async def test_write_grid_feed_power_limit(hass: HomeAssistant) -> None:
-    await setup(hass, {CONF_ALLOW_WRITES: True, CONF_GRID_FEED_POWER_MAX: 9600})
-
-    state = hass.states.get(ENTITY_ID)
-    assert state is not None
-    assert state.state == "9600.0"
-    assert state.attributes["max"] == 9600
-    assert state.attributes["unit_of_measurement"] == "W"
-
-    with patch(
-        "custom_components.rct_power.RctPowerApiClient.async_write_value",
-        new=AsyncMock(side_effect=lambda object_id, value: response(value)),
-    ) as write:
-        # an unchanged value is not written
-        await set_value(hass, 9600)
-        write.assert_not_called()
-
-        await set_value(hass, 5000)
-        write.assert_awaited_once_with(LIMIT_ID, 5000)
-
-    assert hass.states.get(ENTITY_ID).state == "5000.0"  # type: ignore
-    # the read-only sensor follows the written value
-    [sensor] = [
-        s
-        for s in hass.states.async_all("sensor")
-        if s.entity_id.endswith("_grid_maximum_feed_power")
-    ]
-    assert sensor.state == "5000.0"
-
-    # values above the configured ceiling are rejected by Home Assistant
-    with pytest.raises(ServiceValidationError):
-        await set_value(hass, 12000)
-
-
-async def test_write_not_accepted(hass: HomeAssistant) -> None:
-    await setup(hass, {CONF_ALLOW_WRITES: True})
-
-    with (
-        patch(
-            "custom_components.rct_power.RctPowerApiClient.async_write_value",
-            new=AsyncMock(return_value=response(9600.0)),
-        ),
-        pytest.raises(HomeAssistantError),
-    ):
-        await set_value(hass, 4000)
-
-    assert hass.states.get(ENTITY_ID).state == "9600.0"  # type: ignore
 
 
 async def test_write_external_power_reduction(hass: HomeAssistant) -> None:
     """The inverter takes a fraction, Home Assistant shows percent."""
-    await setup(hass, {CONF_ALLOW_WRITES: True})
+    await setup(hass, create_entry(hass, {CONF_ALLOW_WRITES: True}))
 
-    state = hass.states.get(REDUCTION_ENTITY_ID)
+    state = hass.states.get(ENTITY_ID)
     assert state is not None
     assert state.state == "100.0"
     assert state.attributes["unit_of_measurement"] == "%"
 
     with patch(
         "custom_components.rct_power.RctPowerApiClient.async_write_value",
-        new=AsyncMock(
-            side_effect=lambda object_id, value: response(value, REDUCTION_ID)
-        ),
+        new=AsyncMock(side_effect=lambda object_id, value: response(value)),
     ) as write:
-        await set_value(hass, 60, REDUCTION_ENTITY_ID)
+        # an unchanged value is not written
+        await set_value(hass, 100)
+        write.assert_not_called()
+
+        await set_value(hass, 60)
         write.assert_awaited_once_with(REDUCTION_ID, 0.6)
 
-    assert hass.states.get(REDUCTION_ENTITY_ID).state == "60.0"  # type: ignore
+    assert hass.states.get(ENTITY_ID).state == "60.0"  # type: ignore
+    # the read-only sensor follows the written value
     [sensor] = [
         s
         for s in hass.states.async_all("sensor")
         if s.entity_id.endswith("_external_power_reduction")
     ]
     assert sensor.state == "60.0"
+
+    with pytest.raises(ServiceValidationError):
+        await set_value(hass, 120)
+
+
+async def test_write_not_accepted(hass: HomeAssistant) -> None:
+    await setup(hass, create_entry(hass, {CONF_ALLOW_WRITES: True}))
+
+    with (
+        patch(
+            "custom_components.rct_power.RctPowerApiClient.async_write_value",
+            new=AsyncMock(return_value=response(1.0)),
+        ),
+        pytest.raises(HomeAssistantError),
+    ):
+        await set_value(hass, 40)
+
+    assert hass.states.get(ENTITY_ID).state == "100.0"  # type: ignore
+
+
+async def test_removes_old_grid_feed_power_limit(hass: HomeAssistant) -> None:
+    config_entry = create_entry(hass, {CONF_ALLOW_WRITES: True})
+    entity_registry = er.async_get(hass)
+    old = entity_registry.async_get_or_create(
+        NUMBER_DOMAIN,
+        DOMAIN,
+        "test-grid_feed_power_limit",
+        config_entry=config_entry,
+    )
+
+    await setup(hass, config_entry)
+
+    assert entity_registry.async_get(old.entity_id) is None
+    assert hass.states.get(ENTITY_ID) is not None

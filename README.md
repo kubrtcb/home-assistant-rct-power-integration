@@ -223,26 +223,24 @@ valid reading is `null`.
 | Heat Sink Temperature                           | °C   | the instantaneous temperature of the invertor heat sink         |
 | Heat Sink (battery actuator) Temperature        | °C   | the instantaneous temperature of the battery actuator heat sink |
 
-### Changing the grid feed-in limit
+### Limiting the inverter output
 
 The integration only reads from the inverter unless writing is allowed for a
-config entry. To control the maximum power fed into the grid
-(`buf_v_control.power_reduction_max_solar_grid`), open the options of the
-inverter that controls the plant and has the grid power meter attached (the
-master in a master/slave setup) and enable "Allow changing settings of this
-inverter". This adds the entity `number.<prefix>_grid_feed_power_limit`, which
-can be set between 0 W and the configured ceiling (9600 W by default).
-
-The same option adds `number.<prefix>_external_power_reduction`
+config entry. To limit the output, open the options of the inverter that
+controls the plant and has the grid power meter attached (the master in a
+master/slave setup) and enable "Allow changing settings of this inverter".
+This adds the entity `number.<prefix>_external_power_reduction`
 (`buf_v_control.power_reduction`), which limits the inverter to a percentage of
-the solar plant peak power ("Generator Maximum Power"). On some setups only this
-external power reduction changes the actual output, while the feed-in limit in
-W is accepted but has no visible effect.
+the solar plant peak power ("Generator Maximum Power"); 100 % means no
+reduction.
 
-The inverter keeps these settings permanently, so the value is only written when
-it changes and should not be changed every few seconds by an automation. The
-value read back from the inverter is shown in the entity and in the
-"Grid Maximum Feed Power" sensor.
+Writing the feed-in limit in W (`buf_v_control.power_reduction_max_solar_grid`)
+is not offered: the inverter accepts the value but it has no effect on the
+output. It is still shown as the "Grid Maximum Feed Power" sensor.
+
+The value is only written when it changes and the value read back from the
+inverter is shown in the entity and the "External Power Reduction" sensor.
+Avoid changing it every few seconds from an automation.
 
 ## Contributions are welcome!
 
