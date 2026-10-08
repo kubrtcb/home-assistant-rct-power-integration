@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -152,9 +153,14 @@ class RctPowerSensorEntity(SensorEntity, RctPowerEntity):
 
     @property
     def native_value(self) -> StateType | date | datetime | Decimal:
-        return self.entity_description.get_native_value(
+        value = self.entity_description.get_native_value(
             self, self.get_valid_api_responses()
         )
+        # some inverters report inf or nan for counters they don't have,
+        # which Home Assistant rejects for numeric sensors
+        if isinstance(value, float) and not math.isfinite(value):
+            return None
+        return value
 
     @cached_property
     def native_unit_of_measurement(self) -> str | None:
