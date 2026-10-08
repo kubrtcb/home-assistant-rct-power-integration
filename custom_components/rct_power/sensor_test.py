@@ -19,6 +19,9 @@ from custom_components.rct_power.const import (
     DEFAULT_PORT,
     DOMAIN,
 )
+from custom_components.rct_power.diagnostics import (
+    async_get_config_entry_diagnostics,
+)
 from custom_components.rct_power.lib.api import (
     ApiResponseValue,
     RctPowerData,
@@ -57,6 +60,7 @@ async def fake_get_data(object_ids: list[int]) -> RctPowerData:
             object_id=object_id,
             time=datetime.now(tz=UTC),
             value=get_value(names[object_id]),
+            raw=raw if isinstance(raw := RAW_VALUES[names[object_id]], bytes) else None,
         )
         for object_id in object_ids
         if object_id in names
@@ -124,3 +128,12 @@ async def test_battery_module_sensors(hass: HomeAssistant) -> None:
     device = dr.async_get(hass).async_get(entity_entry.device_id)
     assert device is not None
     assert (DOMAIN, "BMS2") in device.identifiers
+
+    # diagnostics expose decoded values and raw payloads
+    diagnostics = await async_get_config_entry_diagnostics(hass, config_entry)
+    assert diagnostics["entry"]["data"][CONF_HOSTNAME] == "**REDACTED**"
+    tower_2_cells = diagnostics["objects"]["battery_placeholder[0].cells[5]"]
+    assert tower_2_cells["valid"] is True
+    assert tower_2_cells["raw"] == RAW_VALUES["battery_placeholder[0].cells[5]"].hex()  # type: ignore
+    assert tower_2_cells["value"]["cells"]["0"]["voltage_mv"] == 3280
+    assert diagnostics["objects"]["battery.cells[1]"]["valid"] is False

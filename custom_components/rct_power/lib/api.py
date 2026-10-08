@@ -7,7 +7,7 @@ import re
 import struct
 from asyncio import StreamReader, StreamWriter, open_connection
 from asyncio.locks import Lock
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from homeassistant.helpers.update_coordinator import UpdateFailed
@@ -70,6 +70,8 @@ def get_response_data_type(object_id: int) -> DataType:
 class BaseApiResponse:
     object_id: int
     time: datetime
+    # the undecoded payload, kept for diagnostics
+    raw: bytes | None = field(default=None, kw_only=True, repr=False)
 
 
 @dataclass
@@ -179,10 +181,26 @@ class RctPowerApiClient:
                             )
                             continue
 
-                        decoded_value: ApiResponseValue = decode_value(
-                            data_type,  # type: ignore
-                            response_frame.data,
-                        )  # type: ignore
+                        try:
+                            decoded_value: ApiResponseValue = decode_value(
+                                data_type,  # type: ignore
+                                response_frame.data,
+                            )  # type: ignore
+                        except (struct.error, ValueError) as exc:
+                            LOGGER.debug(
+                                "Error decoding object %x (%s) as %s: %s (payload %s)",
+                                object_id,
+                                object_name,
+                                data_type,
+                                str(exc),
+                                response_frame.data.hex(),
+                            )
+                            return InvalidApiResponse(
+                                object_id=object_id,
+                                time=request_time,
+                                cause="PARSING_ERROR",
+                                raw=response_frame.data,
+                            )
 
                         LOGGER.debug(
                             "Decoded data for object %x (%s): %s",
@@ -195,6 +213,7 @@ class RctPowerApiClient:
                             object_id=object_id,
                             time=request_time,
                             value=decoded_value,
+                            raw=response_frame.data,
                         )
                     else:
                         LOGGER.debug(
