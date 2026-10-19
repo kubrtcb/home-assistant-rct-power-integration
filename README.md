@@ -274,8 +274,9 @@ With writing allowed, the same config entry also gets:
 
 - `select.<battery>_battery_state_of_charge_strategy` (`power_mng.soc_strategy`)
   chooses how the inverter sets the battery SOC target: `Internal` (the
-  default, based on the solar forecast), `Constant`, `External`, `Schedule`,
-  `SOC target = SOC` or `Middle battery voltage`.
+  default, based on the solar forecast), `Constant`, `External` or `Schedule`.
+  The undocumented strategies `SOC target = SOC` and `Middle battery voltage`
+  are not offered and show as unknown.
 - `number.<battery>_battery_external_power` (`power_mng.battery_power_extern`)
   is the battery power in W while the strategy is `External`; positive values
   discharge and negative values charge the battery. Charging from the grid with

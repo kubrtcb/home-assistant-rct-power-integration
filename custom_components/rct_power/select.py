@@ -11,7 +11,6 @@ from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity import Entity
-from rctclient.registry import REGISTRY
 
 from . import RctConfigEntry
 from .const import CONF_ALLOW_WRITES, EntityUpdatePriority
@@ -27,8 +26,8 @@ class RctPowerSelectEntityDescription(
     pass
 
 
-def get_enum_map(object_name: str) -> dict[int, str]:
-    return REGISTRY.get_by_name(object_name).enum_map or {}
+# the app only offers these, the others are undocumented
+SOC_STRATEGIES = ["Constant", "External", "Internal", "Schedule"]
 
 
 select_entity_descriptions: list[RctPowerSelectEntityDescription] = [
@@ -39,7 +38,7 @@ select_entity_descriptions: list[RctPowerSelectEntityDescription] = [
         name="Battery State of Charge Strategy",
         icon="mdi:battery-charging-high",
         update_priority=EntityUpdatePriority.INFREQUENT,
-        options=list(get_enum_map("power_mng.soc_strategy").values()),
+        options=SOC_STRATEGIES,
         entity_category=EntityCategory.CONFIG,
     ),
 ]
@@ -57,8 +56,10 @@ class RctPowerSelectEntity(SelectEntity, RctPowerEntity):
         value = self.get_valid_api_response_value_by_id(
             self.object_infos[0].object_id, None
         )
-        if isinstance(value, int):
-            return self.enum_map.get(value)
+        if isinstance(value, int) and (option := self.enum_map.get(value)) in (
+            self.options
+        ):
+            return option
         return None
 
     async def async_select_option(self, option: str) -> None:

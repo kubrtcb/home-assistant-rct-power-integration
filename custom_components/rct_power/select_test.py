@@ -119,7 +119,7 @@ async def test_write_soc_strategy(hass: HomeAssistant) -> None:
     assert hass.states.get(SELECT_ENTITY_ID).state == "External"  # type: ignore
 
     with pytest.raises(ServiceValidationError):
-        await select_option(hass, "Turbo")
+        await select_option(hass, "Middle battery voltage")
 
 
 async def test_soc_strategy_not_accepted(hass: HomeAssistant) -> None:
