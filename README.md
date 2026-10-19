@@ -276,9 +276,9 @@ inverter" in the options of each inverter with a battery to get:
 
 - `select.<battery>_battery_state_of_charge_strategy` (`power_mng.soc_strategy`)
   chooses how the inverter sets the battery SOC target: `Internal` (the
-  default, based on the solar forecast), `Constant`, `External` or `Schedule`.
-  The undocumented strategies `SOC target = SOC` and `Middle battery voltage`
-  are not offered and show as unknown.
+  default, based on the solar forecast), `Constant`, `External`, `Schedule` or
+  the undocumented `SOC target = SOC`. The undocumented `Middle battery
+  voltage` is not offered and shows as unknown.
 - `number.<battery>_battery_state_of_charge_constant_target`
   (`power_mng.soc_target_set`) is the SOC target in % while the strategy is
   `Constant`.

@@ -26,8 +26,9 @@ class RctPowerSelectEntityDescription(
     pass
 
 
-# the app only offers these, the others are undocumented
-SOC_STRATEGIES = ["Constant", "External", "Internal", "Schedule"]
+# the app offers the first four, "SOC target = SOC" is undocumented but kept
+# for testing, "Middle battery voltage" is left out
+SOC_STRATEGIES = ["Constant", "External", "Internal", "Schedule", "SOC target = SOC"]
 
 
 select_entity_descriptions: list[RctPowerSelectEntityDescription] = [
