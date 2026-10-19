@@ -20,6 +20,7 @@ from homeassistant.helpers.entity import Entity
 
 from . import RctConfigEntry
 from .const import (
+    CONF_ALLOW_BATTERY_WRITES,
     CONF_ALLOW_WRITES,
     DOMAIN,
     EntityUpdatePriority,
@@ -38,6 +39,8 @@ class RctPowerNumberEntityDescription(
 ):
     # the inverter value multiplied by this is shown in Home Assistant
     scale: float = 1
+    # the config entry option that enables writing
+    write_option: str = CONF_ALLOW_WRITES
 
 
 number_entity_descriptions: list[RctPowerNumberEntityDescription] = [
@@ -64,6 +67,7 @@ number_entity_descriptions: list[RctPowerNumberEntityDescription] = [
         unique_id="soc_target_set",
         name="Battery State of Charge Constant Target",
         icon="mdi:battery-arrow-up",
+        write_option=CONF_ALLOW_BATTERY_WRITES,
         update_priority=EntityUpdatePriority.INFREQUENT,
         native_unit_of_measurement=PERCENTAGE,
         native_min_value=0,
@@ -80,6 +84,7 @@ number_entity_descriptions: list[RctPowerNumberEntityDescription] = [
         unique_id="battery_power_extern",
         name="Battery External Power",
         icon="mdi:battery-sync",
+        write_option=CONF_ALLOW_BATTERY_WRITES,
         update_priority=EntityUpdatePriority.INFREQUENT,
         native_unit_of_measurement=UnitOfPower.WATT,
         native_min_value=-10000,
@@ -124,11 +129,8 @@ async def async_setup_entry(
     entry: RctConfigEntry,
     async_add_entities: Callable[[list[Entity]], None],
 ) -> None:
-    """Setup number platform, only if writing is allowed for this inverter."""
+    """Setup number platform for the settings writing is allowed for."""
     options = cast(RctConfEntryOptions, entry.options)
-
-    if not options.get(CONF_ALLOW_WRITES, False):
-        return
 
     # the feed-in limit in W was accepted by the inverter but had no effect
     entity_registry = er.async_get(hass)
@@ -147,5 +149,6 @@ async def async_setup_entry(
                 entity_description=entity_description,
             )
             for entity_description in number_entity_descriptions
+            if options.get(entity_description.write_option, False)
         ]
     )

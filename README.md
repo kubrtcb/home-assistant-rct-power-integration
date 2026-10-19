@@ -254,7 +254,7 @@ valid reading is `null`.
 The integration only reads from the inverter unless writing is allowed for a
 config entry. To limit the output, open the options of the inverter that
 controls the plant and has the grid power meter attached (the master in a
-master/slave setup) and enable "Allow changing settings of this inverter".
+master/slave setup) and enable "Allow changing the power reduction of this inverter".
 This adds the entity `number.<prefix>_external_power_reduction`
 (`buf_v_control.power_reduction`), which limits the inverter to a percentage of
 the solar plant peak power ("Generator Maximum Power"); 100 % means no
@@ -270,7 +270,9 @@ Avoid changing it every few seconds from an automation.
 
 ### Controlling the battery
 
-With writing allowed, the same config entry also gets:
+Every inverter keeps its own battery settings, a slave does not take them
+from the master. Enable "Allow changing the battery settings of this
+inverter" in the options of each inverter with a battery to get:
 
 - `select.<battery>_battery_state_of_charge_strategy` (`power_mng.soc_strategy`)
   chooses how the inverter sets the battery SOC target: `Internal` (the
@@ -286,8 +288,7 @@ With writing allowed, the same config entry also gets:
   more than the maintenance charge power also needs "Utilize external Inverter
   energy" (`power_mng.use_grid_power_enable`) on the inverter.
 
-The master hands the SOC target to the slaves, so enable writing only on the
-master. The inverter keeps the strategy until it is changed again, so switch
+The inverter keeps the strategy until it is changed again, so switch
 back to `Internal` to return control to the inverter. Calibration and balancing
 still charge the battery to 100 % regardless of the strategy.
 

@@ -13,7 +13,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity import Entity
 
 from . import RctConfigEntry
-from .const import CONF_ALLOW_WRITES, EntityUpdatePriority
+from .const import CONF_ALLOW_BATTERY_WRITES, EntityUpdatePriority
 from .lib.device_info_helpers import get_battery_device_info
 from .lib.entity import RctPowerEntity, RctPowerEntityDescription
 from .models import RctConfEntryOptions
@@ -85,7 +85,7 @@ async def async_setup_entry(
     """Setup select platform, only if writing is allowed for this inverter."""
     options = cast(RctConfEntryOptions, entry.options)
 
-    if not options.get(CONF_ALLOW_WRITES, False):
+    if not options.get(CONF_ALLOW_BATTERY_WRITES, False):
         return
 
     data = entry.runtime_data
