@@ -36,6 +36,7 @@ from custom_components.rct_power.const import (
 from custom_components.rct_power.lib.api import RctPowerData, ValidApiResponse
 
 STRATEGY_ID = REGISTRY.get_by_name("power_mng.soc_strategy").object_id
+TARGET_ID = REGISTRY.get_by_name("power_mng.soc_target_set").object_id
 POWER_ID = REGISTRY.get_by_name("power_mng.battery_power_extern").object_id
 SELECT_ENTITY_ID = "select.battery_at_master_master_battery_state_of_charge_strategy"
 NUMBER_ENTITY_ID = "number.battery_at_master_master_battery_external_power"
@@ -57,6 +58,8 @@ async def fake_get_data(object_ids: list[int]) -> RctPowerData:
             data[object_id] = response(object_id, "Master")  # type: ignore
         elif object_id == STRATEGY_ID:
             data[object_id] = response(object_id, 4)
+        elif object_id == TARGET_ID:
+            data[object_id] = response(object_id, 0.97)
         elif object_id == POWER_ID:
             data[object_id] = response(object_id, 0.0)
     return data
@@ -164,3 +167,27 @@ async def test_write_battery_external_power(hass: HomeAssistant) -> None:
         hass.states.get("sensor.battery_at_master_master_battery_external_power").state
         == "-3000.0"
     )  # type: ignore
+
+
+async def test_write_constant_soc_target(hass: HomeAssistant) -> None:
+    """The inverter takes a fraction, Home Assistant shows percent."""
+    await setup(hass, {CONF_ALLOW_WRITES: True})
+
+    entity_id = (
+        "number.battery_at_master_master_battery_state_of_charge_constant_target"
+    )
+    assert hass.states.get(entity_id).state == "97.0"  # type: ignore
+
+    with patch(
+        "custom_components.rct_power.RctPowerApiClient.async_write_value",
+        new=AsyncMock(side_effect=response),
+    ) as write:
+        await hass.services.async_call(
+            NUMBER_DOMAIN,
+            SERVICE_SET_VALUE,
+            {ATTR_ENTITY_ID: entity_id, ATTR_VALUE: 80},
+            blocking=True,
+        )
+        write.assert_awaited_once_with(TARGET_ID, 0.8)
+
+    assert hass.states.get(entity_id).state == "80.0"  # type: ignore

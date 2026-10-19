@@ -277,6 +277,9 @@ With writing allowed, the same config entry also gets:
   default, based on the solar forecast), `Constant`, `External` or `Schedule`.
   The undocumented strategies `SOC target = SOC` and `Middle battery voltage`
   are not offered and show as unknown.
+- `number.<battery>_battery_state_of_charge_constant_target`
+  (`power_mng.soc_target_set`) is the SOC target in % while the strategy is
+  `Constant`.
 - `number.<battery>_battery_external_power` (`power_mng.battery_power_extern`)
   is the battery power in W while the strategy is `External`; positive values
   discharge and negative values charge the battery. Charging from the grid with

@@ -57,6 +57,22 @@ number_entity_descriptions: list[RctPowerNumberEntityDescription] = [
         mode=NumberMode.BOX,
         entity_category=EntityCategory.CONFIG,
     ),
+    # only used while the SOC strategy is "Constant"
+    RctPowerNumberEntityDescription(
+        get_device_info=get_battery_device_info,
+        key="power_mng.soc_target_set",
+        unique_id="soc_target_set",
+        name="Battery State of Charge Constant Target",
+        icon="mdi:battery-arrow-up",
+        update_priority=EntityUpdatePriority.INFREQUENT,
+        native_unit_of_measurement=PERCENTAGE,
+        native_min_value=0,
+        native_max_value=100,
+        native_step=1,
+        scale=100,
+        mode=NumberMode.BOX,
+        entity_category=EntityCategory.CONFIG,
+    ),
     # only used while the SOC strategy is "External"
     RctPowerNumberEntityDescription(
         get_device_info=get_battery_device_info,
