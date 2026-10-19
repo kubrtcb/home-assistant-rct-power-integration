@@ -12,7 +12,7 @@ from homeassistant.components.number import (
     NumberEntityDescription,
     NumberMode,
 )
-from homeassistant.const import PERCENTAGE, EntityCategory, Platform
+from homeassistant.const import PERCENTAGE, EntityCategory, Platform, UnitOfPower
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
@@ -24,8 +24,10 @@ from .const import (
     DOMAIN,
     EntityUpdatePriority,
 )
-from .lib.api import ValidApiResponse
-from .lib.device_info_helpers import get_inverter_device_info
+from .lib.device_info_helpers import (
+    get_battery_device_info,
+    get_inverter_device_info,
+)
 from .lib.entity import RctPowerEntity, RctPowerEntityDescription
 from .models import RctConfEntryOptions
 
@@ -55,6 +57,21 @@ number_entity_descriptions: list[RctPowerNumberEntityDescription] = [
         mode=NumberMode.BOX,
         entity_category=EntityCategory.CONFIG,
     ),
+    # only used while the SOC strategy is "External"
+    RctPowerNumberEntityDescription(
+        get_device_info=get_battery_device_info,
+        key="power_mng.battery_power_extern",
+        unique_id="battery_power_extern",
+        name="Battery External Power",
+        icon="mdi:battery-sync",
+        update_priority=EntityUpdatePriority.INFREQUENT,
+        native_unit_of_measurement=UnitOfPower.WATT,
+        native_min_value=-10000,
+        native_max_value=10000,
+        native_step=100,
+        mode=NumberMode.BOX,
+        entity_category=EntityCategory.CONFIG,
+    ),
 ]
 
 
@@ -77,28 +94,12 @@ class RctPowerNumberEntity(NumberEntity, RctPowerEntity):
         ):
             return
 
-        object_id = self.object_infos[0].object_id
-        coordinator = self.coordinators[0]
         scale = self.entity_description.scale
-        response = await coordinator.client.async_write_value(object_id, value / scale)
+        written = await self.async_write_value(value / scale)
 
-        if not isinstance(response, ValidApiResponse) or not isinstance(
-            response.value, int | float
-        ):
+        if not math.isclose(written * scale, value, abs_tol=0.5):
             raise HomeAssistantError(
-                f"The inverter did not confirm the new value for {self.name}"
-            )
-
-        # update every coordinator that holds this object so all entities agree
-        for coordinator in self.coordinators:
-            if object_id in coordinator.object_ids:
-                coordinator.async_set_updated_data(
-                    {**coordinator.data, object_id: response}
-                )
-
-        if not math.isclose(response.value * scale, value, abs_tol=0.5):
-            raise HomeAssistantError(
-                f"The inverter kept {response.value * scale} instead of {value}"
+                f"The inverter kept {written * scale} instead of {value}"
             )
 
 

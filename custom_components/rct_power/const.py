@@ -10,7 +10,12 @@ LOGGER = logging.getLogger(__package__)
 
 DOMAIN: Final = "rct_power"
 ICON: Final = "mdi:solar-power"
-PLATFORMS: Final = [Platform.BINARY_SENSOR, Platform.NUMBER, Platform.SENSOR]
+PLATFORMS: Final = [
+    Platform.BINARY_SENSOR,
+    Platform.NUMBER,
+    Platform.SELECT,
+    Platform.SENSOR,
+]
 
 NAME: Final = "RCT Power"
 INVERTER_MODEL: Final = "RCT Power Storage"
