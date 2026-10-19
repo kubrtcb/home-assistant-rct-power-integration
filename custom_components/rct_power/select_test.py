@@ -27,6 +27,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from rctclient.registry import REGISTRY
 
 from custom_components.rct_power.const import (
+    CONF_ALLOW_BATTERY_WRITES,
     CONF_ALLOW_WRITES,
     CONF_ENTITY_PREFIX,
     CONF_HOSTNAME,
@@ -94,14 +95,19 @@ async def select_option(hass: HomeAssistant, option: str) -> None:
     )
 
 
-async def test_no_select_without_allow_writes(hass: HomeAssistant) -> None:
-    await setup(hass, {})
+async def test_no_select_without_allow_battery_writes(hass: HomeAssistant) -> None:
+    """The power reduction option alone does not allow battery settings."""
+    await setup(hass, {CONF_ALLOW_WRITES: True})
     assert hass.states.async_all(SELECT_DOMAIN) == []
     assert hass.states.get(NUMBER_ENTITY_ID) is None
+    assert hass.states.get("number.master_external_power_reduction") is not None
 
 
 async def test_write_soc_strategy(hass: HomeAssistant) -> None:
-    await setup(hass, {CONF_ALLOW_WRITES: True})
+    await setup(hass, {CONF_ALLOW_BATTERY_WRITES: True})
+
+    # the battery option alone does not allow the power reduction
+    assert hass.states.get("number.master_external_power_reduction") is None
 
     state = hass.states.get(SELECT_ENTITY_ID)
     assert state is not None
@@ -126,7 +132,7 @@ async def test_write_soc_strategy(hass: HomeAssistant) -> None:
 
 
 async def test_soc_strategy_not_accepted(hass: HomeAssistant) -> None:
-    await setup(hass, {CONF_ALLOW_WRITES: True})
+    await setup(hass, {CONF_ALLOW_BATTERY_WRITES: True})
 
     with (
         patch(
@@ -142,7 +148,7 @@ async def test_soc_strategy_not_accepted(hass: HomeAssistant) -> None:
 
 async def test_write_battery_external_power(hass: HomeAssistant) -> None:
     """Negative values charge the battery, positive values discharge it."""
-    await setup(hass, {CONF_ALLOW_WRITES: True})
+    await setup(hass, {CONF_ALLOW_BATTERY_WRITES: True})
 
     state = hass.states.get(NUMBER_ENTITY_ID)
     assert state is not None
@@ -171,7 +177,7 @@ async def test_write_battery_external_power(hass: HomeAssistant) -> None:
 
 async def test_write_constant_soc_target(hass: HomeAssistant) -> None:
     """The inverter takes a fraction, Home Assistant shows percent."""
-    await setup(hass, {CONF_ALLOW_WRITES: True})
+    await setup(hass, {CONF_ALLOW_BATTERY_WRITES: True})
 
     entity_id = (
         "number.battery_at_master_master_battery_state_of_charge_constant_target"

@@ -12,6 +12,7 @@ from homeassistant.const import CONF_PORT
 from homeassistant.core import callback
 
 from .const import (
+    CONF_ALLOW_BATTERY_WRITES,
     CONF_ALLOW_WRITES,
     CONF_ENTITY_PREFIX,
     CONF_HOSTNAME,
@@ -119,5 +120,7 @@ OPTIONS_SCHEMA = vol.Schema(
         ): cv.positive_int,
         # only enable on the inverter that controls the plant (the master)
         vol.Optional(CONF_ALLOW_WRITES, default=False): bool,
+        # every inverter keeps its own battery settings
+        vol.Optional(CONF_ALLOW_BATTERY_WRITES, default=False): bool,
     }
 )

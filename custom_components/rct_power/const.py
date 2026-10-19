@@ -35,6 +35,7 @@ CONF_HOSTNAME: Final = "hostname"
 
 # writing settings to the inverter, off by default
 CONF_ALLOW_WRITES: Final = "allow_writes"
+CONF_ALLOW_BATTERY_WRITES: Final = "allow_battery_writes"
 
 DEFAULT_ENTITY_PREFIX: Final = "RCT Power Storage"
 DEFAULT_PORT: Final = 8899
