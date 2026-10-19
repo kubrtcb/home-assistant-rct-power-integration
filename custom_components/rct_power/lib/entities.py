@@ -318,6 +318,22 @@ battery_sensor_entity_descriptions: list[RctPowerSensorEntityDescription] = [
     ),
     RctPowerSensorEntityDescription(
         get_device_info=get_battery_device_info,
+        key="power_mng.soc_target_set",
+        name="Battery State of Charge Constant Target",
+        update_priority=EntityUpdatePriority.INFREQUENT,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement="%",
+    ),
+    RctPowerSensorEntityDescription(
+        get_device_info=get_battery_device_info,
+        key="power_mng.battery_power_extern",
+        name="Battery External Power",
+        update_priority=EntityUpdatePriority.INFREQUENT,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfPower.WATT,
+    ),
+    RctPowerSensorEntityDescription(
+        get_device_info=get_battery_device_info,
         key="battery.efficiency",
         name="Battery Efficiency",
         update_priority=EntityUpdatePriority.INFREQUENT,

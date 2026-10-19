@@ -18,6 +18,7 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
 )
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import EntityDescription
 from homeassistant.helpers.typing import UNDEFINED, StateType, UndefinedType
@@ -87,6 +88,27 @@ class RctPowerEntity(MultiCoordinatorEntity):
         return get_valid_response_value_or(
             self.get_api_response_by_name(object_name, None), default
         )
+
+    async def async_write_value(self, value: float) -> int | float:
+        """Write the entity's object and return the value read back."""
+        object_id = self.object_infos[0].object_id
+        response = await self.coordinators[0].client.async_write_value(object_id, value)
+
+        if not isinstance(response, ValidApiResponse) or not isinstance(
+            response.value, int | float
+        ):
+            raise HomeAssistantError(
+                f"The inverter did not confirm the new value for {self.name}"
+            )
+
+        # update every coordinator that holds this object so all entities agree
+        for coordinator in self.coordinators:
+            if object_id in coordinator.object_ids:
+                coordinator.async_set_updated_data(
+                    {**coordinator.data, object_id: response}
+                )
+
+        return response.value
 
     @cached_property
     def unique_id(self) -> str | None:

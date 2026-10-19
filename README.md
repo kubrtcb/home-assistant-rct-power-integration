@@ -268,6 +268,29 @@ The value is only written when it changes and the value read back from the
 inverter is shown in the entity and the "External Power Reduction" sensor.
 Avoid changing it every few seconds from an automation.
 
+### Controlling the battery
+
+With writing allowed, the same config entry also gets:
+
+- `select.<battery>_battery_state_of_charge_strategy` (`power_mng.soc_strategy`)
+  chooses how the inverter sets the battery SOC target: `Internal` (the
+  default, based on the solar forecast), `Constant`, `External` or `Schedule`.
+  The undocumented strategies `SOC target = SOC` and `Middle battery voltage`
+  are not offered and show as unknown.
+- `number.<battery>_battery_state_of_charge_constant_target`
+  (`power_mng.soc_target_set`) is the SOC target in % while the strategy is
+  `Constant`.
+- `number.<battery>_battery_external_power` (`power_mng.battery_power_extern`)
+  is the battery power in W while the strategy is `External`; positive values
+  discharge and negative values charge the battery. Charging from the grid with
+  more than the maintenance charge power also needs "Utilize external Inverter
+  energy" (`power_mng.use_grid_power_enable`) on the inverter.
+
+The master hands the SOC target to the slaves, so enable writing only on the
+master. The inverter keeps the strategy until it is changed again, so switch
+back to `Internal` to return control to the inverter. Calibration and balancing
+still charge the battery to 100 % regardless of the strategy.
+
 ## Contributions are welcome!
 
 If you want to contribute to this please read the [Contribution guidelines](CONTRIBUTING.md)
